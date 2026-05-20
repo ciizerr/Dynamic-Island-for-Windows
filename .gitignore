@@ -1,0 +1,5 @@
+# Windhawk workspace directories
+temp-windhawk/
+
+# Local validation/utility scripts
+pr_validation.py
