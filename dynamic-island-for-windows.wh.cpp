@@ -2,11 +2,11 @@
 // @id              dynamic-island-for-windows
 // @name            Dynamic Island for Windows
 // @description     A living, breathing pill overlay inspired by iPhone's Dynamic Island. Reacts to media, downloads, clipboard, battery, and more.
-// @version         1.0.2
+// @version         1.1.0
 // @author          Himanshu
 // @github          https://github.com/devcode90
 // @include         windhawk.exe
-// @compilerOptions -lole32 -loleaut32 -lshcore -ld2d1 -ldwrite -ldwmapi -lgdi32 -luser32 -lshell32 -lruntimeobject -lwindowscodecs -lavrt -lsetupapi
+// @compilerOptions -lole32 -loleaut32 -lshcore -ld2d1 -ldwrite -ldwmapi -lgdi32 -luser32 -lshell32 -lruntimeobject -lwindowscodecs -lavrt -lsetupapi -lwinhttp
 // @license         MIT
 // ==/WindhawkMod==
 
@@ -41,78 +41,96 @@ A fluid, living overlay inspired by Apple's Dynamic Island, bringing a beautiful
 
 // ==WindhawkModSettings==
 /*
-- Position: top-center
-  $name: Position
-  $options:
-    - top-center: Top Center
-    - top-left: Top Left
-    - top-right: Top Right
-    - bottom-center: Bottom Center
-- SizeScale: '1.0'
-  $name: Size scale
-  $options:
-    - '0.8': 0.8x
-    - '1.0': 1.0x
-    - '1.2': 1.2x
-    - '1.5': 1.5x
-    - '1.8': 1.8x
-    - '2.0': 2.0x
-    - '2.5': 2.5x
-- AccentColorMode: auto
-  $name: Accent color mode
-  $options:
-    - auto: Auto, from album art
-    - system: System
-    - custom: Custom hex
-- CustomAccentHex: "#4cc9f0"
-  $name: Custom accent hex
-- AnimationSpeed: normal
-  $name: Animation speed
-  $options:
-    - slow: Slow
-    - normal: Normal
-    - fast: Fast
-- Media: true
-  $name: Media module
-- Clipboard: true
-  $name: Clipboard module
-- Battery: true
-  $name: Battery module
-- Progress: true
-  $name: Progress module
-- BlurIntensity: 72
-  $name: Blur intensity
-  $description: 0 to 100. Used as the D2D dark tint opacity percentage.
-- PillOpacity: 96
-  $name: Pill transparency
-  $description: 35 to 100. Lower values make the island more transparent.
-- GameOverlay: false
-  $name: Enable game overlay mode
-  $description: Shows FPS, CPU, RAM, GPU placeholder, disk, and foreground app.
-- ShowMetricText: false
-  $name: Show labels in metric chips
-  $description: Shows text labels and percentages inside the metric chips (FPS, CPU, RAM, etc).
-- AlwaysShowClock: true
-  $name: Always show dynamic island
-  $description: "Shows the idle island (clock/system metrics) when no media is playing."
-- AlwaysOnTop: true
-  $name: Always on top
-  $description: "Keep the island above all other windows. Disable if it blocks other software."
-- AutoDpiScale: true
-  $name: Auto DPI scaling
-  $description: "Automatically scale the island to match your monitor's DPI (recommended for 4K/HiDPI screens)."
-- W11Style: false
-  $name: Native Windows 11 style
-  $description: "Renders the island as a modern Windows 11 Fluent flyout (rounded rectangle with 8px corners) instead of an iOS pill."
-- PillBgColor: "#0D0D0F"
-  $name: Pill background color
-  $description: "Hex color for pill background. Presets: #0D0D0F (OLED Black), #1C1C1E (Dark Gray), #0A0A1A (Midnight Blue), #12001E (Deep Purple)"
-- TextPrimaryColor: "#F7F7F7"
-  $name: Primary text color
-  $description: "Hex color for titles and main text."
-- TextSecondaryColor: "#888888"
-  $name: Secondary text color
-  $description: "Hex color for artist, app name, muted labels."
+- Appearance:
+  - Position: top-center
+    $name: Position
+    $description: Where the island should appear on your screen.
+    $options:
+      - top-center: Top Center
+      - top-left: Top Left
+      - top-right: Top Right
+      - bottom-center: Bottom Center
+  - SizeScale: '1.0'
+    $name: Size scale
+    $description: Makes the entire island and its contents larger or smaller.
+    $options:
+      - '0.8': 0.8x
+      - '1.0': 1.0x
+      - '1.2': 1.2x
+      - '1.5': 1.5x
+      - '1.8': 1.8x
+      - '2.0': 2.0x
+      - '2.5': 2.5x
+  - AutoDpiScale: true
+    $name: Auto DPI scaling
+    $description: Automatically scales the island to match your monitor's DPI. Recommended for 4K screens.
+  - W11Style: false
+    $name: Native Windows 11 style
+    $description: Changes the shape from an Apple pill to a Windows 11 rounded box.
+  - AlwaysOnTop: true
+    $name: Always on top
+    $description: Keeps the island above all other windows. Turn this off if it blocks other apps.
+  - AnimationSpeed: normal
+    $name: Animation speed
+    $description: How fast the island expands and collapses.
+    $options:
+      - slow: Slow
+      - normal: Normal
+      - fast: Fast
+  $name: Appearance & Behavior
+- Themes:
+  - AccentColorMode: auto
+    $name: Accent color mode
+    $description: How the glowing accent color is chosen. Auto extracts it from album art.
+    $options:
+      - auto: Auto, from album art
+      - system: System
+      - custom: Custom hex
+  - CustomAccentHex: "#4cc9f0"
+    $name: Custom accent hex
+    $description: The hex color to use when the accent mode is set to Custom.
+  - PillBgColor: "#0D0D0F"
+    $name: Pill background color
+    $description: Hex color for the background. Presets are available in the right-click menu.
+  - TextPrimaryColor: "#F7F7F7"
+    $name: Primary text color
+    $description: Hex color for titles and main text.
+  - TextSecondaryColor: "#888888"
+    $name: Secondary text color
+    $description: Hex color for artist names and muted labels.
+  - TintIntensity: 72
+    $name: Background tint intensity
+    $description: 0 to 100. Controls how dark the background tint behind the island is.
+  - PillOpacity: 96
+    $name: Pill transparency
+    $description: 35 to 100. Lower values make the island more see-through.
+  $name: Colors & Theming
+- Modules:
+  - Media: true
+    $name: Media module
+    $description: Shows album art, song info, and playback controls when music is playing.
+  - Clipboard: true
+    $name: Clipboard module
+    $description: Shows a quick preview of the text or images you just copied.
+  - Battery: true
+    $name: Battery module
+    $description: Shows an alert when your laptop battery is running low.
+  - Progress: true
+    $name: Progress module
+    $description: Shows a progress ring around the island for downloads or file copies.
+  - AlwaysShowClock: true
+    $name: Always show dynamic island
+    $description: Shows a minimal clock and system stats when nothing else is happening.
+  - GameOverlay: false
+    $name: Enable game overlay mode
+    $description: Replaces the clock with live stats like FPS, CPU, and RAM usage.
+  - ShowMetricText: false
+    $name: Show labels in metric chips
+    $description: Adds text labels (like "CPU") inside the game overlay bars.
+  - WeatherCity: ""
+    $name: Weather City (Optional)
+    $description: Enter your city (e.g. London). Leave blank to use auto IP geolocation.
+  $name: Modules & Features
 */
 // ==/WindhawkModSettings==
 
@@ -144,6 +162,8 @@ A fluid, living overlay inspired by Apple's Dynamic Island, bringing a beautiful
 #include <objbase.h>
 #include <wrl/client.h>
 #include <uiautomation.h>
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
 
 #include <algorithm>
 #include <array>
@@ -223,10 +243,11 @@ struct Settings {
     bool clipboard = true;
     bool battery = true;
     bool progress = true;
-    float blurOpacity = 0.72f;
+    float tintOpacity = 0.72f;
     float pillOpacity = 0.96f;
     bool gameOverlay = false;
     bool showMetricText = true;
+    std::wstring weatherCity;
     bool alwaysShowClock = true;
     bool alwaysOnTop = true;
     bool autoDpiScale = true;
@@ -344,6 +365,19 @@ struct Activity {
     float height = 36.0f;
 };
 
+struct WeatherSnapshot {
+    bool hasData = false;
+    float temperature = 0.0f;
+    int weatherCode = 0;
+    std::wstring city;
+    std::wstring weatherDesc;
+    std::wstring windSpeed;
+    std::wstring windDir;
+    std::wstring humidity;
+    std::wstring feelsLike;
+    double lastUpdated = 0.0;
+};
+
 struct SharedState {
     MediaSnapshot media;
     ClipboardSnapshot clipboard;
@@ -354,6 +388,7 @@ struct SharedState {
     BatterySnapshot battery;
     ProgressSnapshot progress;
     SystemSnapshot system;
+    WeatherSnapshot weather;
     std::array<float, 48> waveform{};
     size_t waveformWrite = 0;
     bool muted = false;
@@ -392,8 +427,10 @@ HANDLE g_stopEvent = nullptr;
 HANDLE g_renderThread = nullptr;
 HANDLE g_mediaThread = nullptr;
 HANDLE g_audioThread = nullptr;
+HANDLE g_weatherThread = nullptr;
 HANDLE g_notificationThread = nullptr;
 std::atomic<bool> g_running = false;
+std::atomic<int> g_idleTab = 0;
 std::atomic<bool> g_layoutDirty = true;
 FILETIME g_prevIdleTime = {};
 FILETIME g_prevKernelTime = {};
@@ -503,7 +540,7 @@ D2D1_COLOR_F GetSystemAccentColor() {
 void LoadSettings() {
     Settings next;
 
-    const std::wstring position = GetStringSettingCopy(L"Position");
+    const std::wstring position = GetStringSettingCopy(L"Appearance.Position");
     if (EqualsNoCase(position, L"top-left")) {
         next.position = Position::TopLeft;
     } else if (EqualsNoCase(position, L"top-right")) {
@@ -512,7 +549,7 @@ void LoadSettings() {
         next.position = Position::BottomCenter;
     }
 
-    const std::wstring scale = GetStringSettingCopy(L"SizeScale");
+    const std::wstring scale = GetStringSettingCopy(L"Appearance.SizeScale");
     if (!scale.empty()) {
         wchar_t* end;
         float parsedScale = wcstof(scale.c_str(), &end);
@@ -523,43 +560,44 @@ void LoadSettings() {
 
     // Auto DPI scaling: multiply sizeScale by monitor DPI factor.
     // On a 4K 200% display this doubles the island to the right physical size.
-    if (Wh_GetIntSetting(L"AutoDpiScale") != 0) {
+    if (Wh_GetIntSetting(L"Appearance.AutoDpiScale") != 0) {
         next.sizeScale *= GetPrimaryMonitorDpiScale();
     }
 
-    const std::wstring accentMode = GetStringSettingCopy(L"AccentColorMode");
+    const std::wstring accentMode = GetStringSettingCopy(L"Themes.AccentColorMode");
     if (EqualsNoCase(accentMode, L"system")) {
         next.accentMode = AccentMode::System;
     } else if (EqualsNoCase(accentMode, L"custom")) {
         next.accentMode = AccentMode::Custom;
     }
 
-    next.customAccent = ColorFromHex(GetStringSettingCopy(L"CustomAccentHex"), next.customAccent);
+    next.customAccent = ColorFromHex(GetStringSettingCopy(L"Themes.CustomAccentHex"), next.customAccent);
 
-    const std::wstring speed = GetStringSettingCopy(L"AnimationSpeed");
+    const std::wstring speed = GetStringSettingCopy(L"Appearance.AnimationSpeed");
     if (EqualsNoCase(speed, L"slow")) {
         next.animationSpeed = 0.75f;
     } else if (EqualsNoCase(speed, L"fast")) {
         next.animationSpeed = 1.35f;
     }
 
-    next.media = Wh_GetIntSetting(L"Media") != 0;
-    next.clipboard = Wh_GetIntSetting(L"Clipboard") != 0;
-    next.battery = Wh_GetIntSetting(L"Battery") != 0;
-    next.progress = Wh_GetIntSetting(L"Progress") != 0;
-    next.blurOpacity = Clamp(Wh_GetIntSetting(L"BlurIntensity") / 100.0f, 0.0f, 1.0f);
-    const int settingOpacity = Wh_GetIntSetting(L"PillOpacity");
+    next.media = Wh_GetIntSetting(L"Modules.Media") != 0;
+    next.clipboard = Wh_GetIntSetting(L"Modules.Clipboard") != 0;
+    next.battery = Wh_GetIntSetting(L"Modules.Battery") != 0;
+    next.progress = Wh_GetIntSetting(L"Modules.Progress") != 0;
+    next.tintOpacity = Clamp(Wh_GetIntSetting(L"Themes.TintIntensity") / 100.0f, 0.0f, 1.0f);
+    const int settingOpacity = Wh_GetIntSetting(L"Themes.PillOpacity");
     const int localOpacity = Wh_GetIntValue(L"PillOpacityOverride", -1);
     next.pillOpacity = Clamp((localOpacity >= 0 ? localOpacity : settingOpacity) / 100.0f,
                              0.35f, 1.0f);
-    next.gameOverlay = Wh_GetIntSetting(L"GameOverlay") != 0;
-    next.showMetricText = Wh_GetIntSetting(L"ShowMetricText") != 0;
-    next.alwaysShowClock = Wh_GetIntSetting(L"AlwaysShowClock") != 0;
-    next.alwaysOnTop = Wh_GetIntSetting(L"AlwaysOnTop") != 0;
-    next.autoDpiScale = Wh_GetIntSetting(L"AutoDpiScale") != 0;
+    next.gameOverlay = Wh_GetIntSetting(L"Modules.GameOverlay") != 0;
+    next.showMetricText = Wh_GetIntSetting(L"Modules.ShowMetricText") != 0;
+    next.weatherCity = GetStringSettingCopy(L"Modules.WeatherCity");
+    next.alwaysShowClock = Wh_GetIntSetting(L"Modules.AlwaysShowClock") != 0;
+    next.alwaysOnTop = Wh_GetIntSetting(L"Appearance.AlwaysOnTop") != 0;
+    next.autoDpiScale = Wh_GetIntSetting(L"Appearance.AutoDpiScale") != 0;
 
     const int localW11Style = Wh_GetIntValue(L"W11StyleOverride", -1);
-    next.w11Style = localW11Style >= 0 ? (localW11Style != 0) : (Wh_GetIntSetting(L"W11Style") != 0);
+    next.w11Style = localW11Style >= 0 ? (localW11Style != 0) : (Wh_GetIntSetting(L"Appearance.W11Style") != 0);
 
     // Color settings — check local theme override first, then settings YAML.
     struct ThemeColors { const wchar_t* bg; const wchar_t* fg; const wchar_t* sec; };
@@ -579,11 +617,11 @@ void LoadSettings() {
         next.textSecondaryColor = ColorFromHex(kThemes[theme].sec,
                                                D2D1::ColorF(0.533f, 0.533f, 0.533f, 1.0f));
     } else {
-        next.pillBgColor = ColorFromHex(GetStringSettingCopy(L"PillBgColor"),
+        next.pillBgColor = ColorFromHex(GetStringSettingCopy(L"Themes.PillBgColor"),
                                         D2D1::ColorF(0.051f, 0.051f, 0.059f, 1.0f));
-        next.textPrimaryColor = ColorFromHex(GetStringSettingCopy(L"TextPrimaryColor"),
+        next.textPrimaryColor = ColorFromHex(GetStringSettingCopy(L"Themes.TextPrimaryColor"),
                                              D2D1::ColorF(0.969f, 0.969f, 0.969f, 1.0f));
-        next.textSecondaryColor = ColorFromHex(GetStringSettingCopy(L"TextSecondaryColor"),
+        next.textSecondaryColor = ColorFromHex(GetStringSettingCopy(L"Themes.TextSecondaryColor"),
                                                D2D1::ColorF(0.533f, 0.533f, 0.533f, 1.0f));
     }
 
@@ -1457,8 +1495,22 @@ float SampleAudioAmplitude(BYTE* data, UINT32 frames, WAVEFORMATEX* format) {
 
 void PushWaveformSample(float amplitude) {
     std::lock_guard lock(g_stateMutex);
-    float& slot = g_state.waveform[g_state.waveformWrite % g_state.waveform.size()];
-    slot = std::max(amplitude, slot * 0.85f);
+    
+    float lastVal = 0.0f;
+    if (g_state.waveformWrite > 0) {
+        lastVal = g_state.waveform[(g_state.waveformWrite - 1) % g_state.waveform.size()];
+    }
+
+    // Apply an attack/release envelope (Exponential Moving Average)
+    // Quick snappy attack (0.7) for beats, buttery smooth release (0.85) for decay.
+    float smoothed;
+    if (amplitude > lastVal) {
+        smoothed = lastVal * 0.3f + amplitude * 0.7f;
+    } else {
+        smoothed = lastVal * 0.85f + amplitude * 0.15f;
+    }
+
+    g_state.waveform[g_state.waveformWrite % g_state.waveform.size()] = smoothed;
     ++g_state.waveformWrite;
 }
 
@@ -1505,6 +1557,171 @@ void PushAudioChunks(BYTE* data, UINT32 frames, WAVEFORMATEX* format) {
 
         PushWaveformSample(Clamp(static_cast<float>(std::sqrt(sum / samples) * 4.0), 0.0f, 1.0f));
     }
+}
+
+// --- Weather Fetching Helpers ---
+std::string HttpGet(const wchar_t* host, const wchar_t* path, bool https = true) {
+    std::string response;
+    HINTERNET hSession = WinHttpOpen(L"DynamicIsland/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) return response;
+
+    HINTERNET hConnect = WinHttpConnect(hSession, host, https ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT, 0);
+    if (hConnect) {
+        HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", path, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, https ? WINHTTP_FLAG_SECURE : 0);
+        if (hRequest) {
+            if (WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                WinHttpReceiveResponse(hRequest, nullptr)) {
+                DWORD size = 0;
+                DWORD downloaded = 0;
+                do {
+                    if (WinHttpQueryDataAvailable(hRequest, &size) && size > 0) {
+                        std::vector<char> buffer(size + 1);
+                        if (WinHttpReadData(hRequest, buffer.data(), size, &downloaded)) {
+                            buffer[downloaded] = '\0';
+                            response.append(buffer.data());
+                        }
+                    }
+                } while (size > 0);
+            }
+            WinHttpCloseHandle(hRequest);
+        }
+        WinHttpCloseHandle(hConnect);
+    }
+    WinHttpCloseHandle(hSession);
+    return response;
+}
+
+DWORD WINAPI WeatherThreadProc(void*) {
+    // Initial delay to avoid slowing down startup
+    WaitForSingleObject(g_stopEvent, 3000);
+
+    while (WaitForSingleObject(g_stopEvent, 0) == WAIT_TIMEOUT) {
+        std::wstring cityOverride;
+        {
+            std::lock_guard lock(g_stateMutex);
+            cityOverride = g_settings.weatherCity;
+        }
+
+        std::wstring url = L"/?format=j1";
+        if (!cityOverride.empty()) {
+            std::wstring urlName = cityOverride;
+            size_t pos = 0;
+            while ((pos = urlName.find(L" ", pos)) != std::wstring::npos) {
+                urlName.replace(pos, 1, L"%20");
+                pos += 3;
+            }
+            url = L"/" + urlName + L"?format=j1";
+        }
+
+        std::string wRes = HttpGet(L"wttr.in", url.c_str(), true);
+        
+        if (!wRes.empty()) {
+            float temp = 0.0f;
+            int code = 0;
+            std::wstring desc = L"";
+            std::wstring windSpeed = L"";
+            std::wstring windDir = L"";
+            std::wstring humidity = L"";
+            std::wstring feelsLike = L"";
+            std::wstring cityLabel = L"Local Weather";
+            
+            const char* areaStr = strstr(wRes.c_str(), "\"areaName\":");
+            if (areaStr) {
+                const char* valStr = strstr(areaStr, "\"value\":");
+                if (valStr) {
+                    valStr += 8;
+                    while (*valStr == ' ' || *valStr == '\"') valStr++;
+                    const char* end = strchr(valStr, '\"');
+                    if (end) {
+                        std::string cityA(valStr, end - valStr);
+                        int wchars_num = MultiByteToWideChar(CP_UTF8, 0, cityA.c_str(), -1, NULL, 0);
+                        if (wchars_num > 0) {
+                            std::vector<wchar_t> wstr(wchars_num);
+                            MultiByteToWideChar(CP_UTF8, 0, cityA.c_str(), -1, &wstr[0], wchars_num);
+                            cityLabel = wstr.data();
+                        }
+                    }
+                }
+            }
+            
+            const char* currentStr = strstr(wRes.c_str(), "\"current_condition\":");
+            if (currentStr) {
+                auto ParseStringField = [&](const char* key, std::wstring& out) {
+                    const char* kStr = strstr(currentStr, key);
+                    if (kStr) {
+                        kStr += strlen(key);
+                        while (*kStr == ' ' || *kStr == '\"' || *kStr == ':') kStr++;
+                        const char* end = strchr(kStr, '\"');
+                        if (end) {
+                            std::string valA(kStr, end - kStr);
+                            int wchars_num = MultiByteToWideChar(CP_UTF8, 0, valA.c_str(), -1, NULL, 0);
+                            if (wchars_num > 0) {
+                                std::vector<wchar_t> wstr(wchars_num);
+                                MultiByteToWideChar(CP_UTF8, 0, valA.c_str(), -1, &wstr[0], wchars_num);
+                                out = wstr.data();
+                            }
+                        }
+                    }
+                };
+
+                const char* tempStr = strstr(currentStr, "\"temp_C\":");
+                if (tempStr) {
+                    tempStr += 9;
+                    while (*tempStr == ' ' || *tempStr == '\"') tempStr++;
+                    sscanf(tempStr, "%f", &temp);
+                }
+                const char* codeStr = strstr(currentStr, "\"weatherCode\":");
+                if (codeStr) {
+                    codeStr += 14;
+                    while (*codeStr == ' ' || *codeStr == '\"') codeStr++;
+                    sscanf(codeStr, "%d", &code);
+                }
+                
+                const char* descStr = strstr(currentStr, "\"weatherDesc\":");
+                if (descStr) {
+                    const char* valStr = strstr(descStr, "\"value\":");
+                    if (valStr) {
+                        valStr += 8;
+                        while (*valStr == ' ' || *valStr == '\"') valStr++;
+                        const char* end = strchr(valStr, '\"');
+                        if (end) {
+                            std::string valA(valStr, end - valStr);
+                            int wchars_num = MultiByteToWideChar(CP_UTF8, 0, valA.c_str(), -1, NULL, 0);
+                            if (wchars_num > 0) {
+                                std::vector<wchar_t> wstr(wchars_num);
+                                MultiByteToWideChar(CP_UTF8, 0, valA.c_str(), -1, &wstr[0], wchars_num);
+                                desc = wstr.data();
+                                while(!desc.empty() && desc.back() == L' ') desc.pop_back();
+                            }
+                        }
+                    }
+                }
+                
+                ParseStringField("\"windspeedKmph\"", windSpeed);
+                ParseStringField("\"winddir16Point\"", windDir);
+                ParseStringField("\"humidity\"", humidity);
+                ParseStringField("\"FeelsLikeC\"", feelsLike);
+            }
+            
+            {
+                std::lock_guard lock(g_stateMutex);
+                g_state.weather.hasData = true;
+                g_state.weather.temperature = temp;
+                g_state.weather.weatherCode = code;
+                if (!cityOverride.empty()) g_state.weather.city = cityOverride;
+                else g_state.weather.city = cityLabel;
+                g_state.weather.weatherDesc = desc;
+                g_state.weather.windSpeed = windSpeed;
+                g_state.weather.windDir = windDir;
+                g_state.weather.humidity = humidity;
+                g_state.weather.feelsLike = feelsLike;
+                g_state.weather.lastUpdated = NowSeconds();
+            }
+        }
+
+        WaitForSingleObject(g_stopEvent, 15 * 60 * 1000);
+    }
+    return 0;
 }
 
 DWORD WINAPI AudioThreadProc(void*) {
@@ -1904,7 +2121,7 @@ bool ClipboardHasBitmap(HWND hwnd) {
 }
 
 bool IsLikelyToastWindow(HWND hwnd, const wchar_t* className, const wchar_t* title) {
-    if (!IsWindowVisible(hwnd) || hwnd == g_hwnd) {
+    if (hwnd == g_hwnd || !hwnd) {
         return false;
     }
 
@@ -1914,19 +2131,33 @@ bool IsLikelyToastWindow(HWND hwnd, const wchar_t* className, const wchar_t* tit
 
     const std::wstring cls = ToLowerCopy(className ? className : L"");
     const std::wstring text = ToLowerCopy(title ? title : L"");
-    if (text.empty()) {
-        return false;
+
+    // Classic Windows 10 toasts have clear class names
+    if (cls.find(L"notification") != std::wstring::npos ||
+        cls.find(L"toast") != std::wstring::npos ||
+        cls.find(L"windows.ui.notifications") != std::wstring::npos) {
+        return true;
     }
 
-    if (IsIgnorableForegroundWindow(hwnd, title ? title : L"")) {
-        return false;
+    // Windows 11 toasts use generic XAML or CoreWindow classes, usually hosted by
+    // explorer.exe, sihost.exe, or ShellExperienceHost.exe.
+    // Importantly, their title is often empty at the exact moment of creation!
+    if (cls.find(L"xaml_windowedpopupclass") != std::wstring::npos ||
+        cls.find(L"windows.ui.core.corewindow") != std::wstring::npos) {
+        
+        std::wstring image;
+        if (ProcessImageNameForWindow(hwnd, &image)) {
+            const std::wstring base = ToLowerCopy(BaseNameFromPath(image));
+            if (base == L"explorer.exe" || base == L"sihost.exe" || base == L"shellexperiencehost.exe") {
+                // Ensure it's not the start menu, search, or action center main panel
+                if (text != L"start" && text != L"action center" && text != L"search" && text != L"task view") {
+                    return true;
+                }
+            }
+        }
     }
 
-    // Match only on class name — title matching is too broad and catches
-    // system windows like Snipping Tool that contain "notification" in their title.
-    return cls.find(L"notification") != std::wstring::npos ||
-           cls.find(L"toast") != std::wstring::npos ||
-           cls.find(L"windows.ui.notifications") != std::wstring::npos;
+    return false;
 }
 
 void CaptureShellNotification(HWND hwnd) {
@@ -1969,7 +2200,7 @@ void CaptureShellNotification(HWND hwnd) {
     // Spawn a background thread to extract the full rich text body of the toast using UI Automation.
     // Modern Windows Toasts often only provide the App Name via GetWindowTextW, leaving the body hidden in the XAML tree.
     std::thread([hwnd]() {
-        Sleep(100); // Give the UWP XAML tree a moment to fully construct
+        Sleep(400); // Give the heavy UWP XAML tree enough time to fully construct the text nodes
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (SUCCEEDED(hr)) {
             IUIAutomation* uia = nullptr;
@@ -2248,7 +2479,7 @@ void ShowContextMenu(HWND hwnd, POINT screenPoint) {
     AppendMenuW(menu, MF_STRING, 3, Wh_GetIntValue(L"GameOverlayPinned", 0) ? L"Hide game overlay" : L"Show game overlay");
     const int activeW11 = Wh_GetIntValue(L"W11StyleOverride", -1) >= 0
                           ? Wh_GetIntValue(L"W11StyleOverride", 0)
-                          : Wh_GetIntSetting(L"W11Style");
+                          : Wh_GetIntSetting(L"Appearance.W11Style");
     AppendMenuW(menu, MF_STRING, 10, activeW11 ? L"Use iPhone Pill Style" : L"Use Windows 11 Flyout Style");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, 4, L"Transparency 100%");
@@ -2317,7 +2548,7 @@ void ShowContextMenu(HWND hwnd, POINT screenPoint) {
         case 10: {
             const int activeW11Val = Wh_GetIntValue(L"W11StyleOverride", -1) >= 0
                                   ? Wh_GetIntValue(L"W11StyleOverride", 0)
-                                  : Wh_GetIntSetting(L"W11Style");
+                                  : Wh_GetIntSetting(L"Appearance.W11Style");
             Wh_SetIntValue(L"W11StyleOverride", activeW11Val ? 0 : 1);
             LoadSettings();
             g_layoutDirty = true;
@@ -2391,7 +2622,11 @@ class Renderer {
                                          DWRITE_FONT_WEIGHT_BOLD,
                                          DWRITE_FONT_STYLE_NORMAL,
                                          DWRITE_FONT_STRETCH_NORMAL,
-                                         13.5f, L"", &clockFormat_);
+                                         18.0f, L"", &clockFormat_);
+        dwriteFactory_->CreateTextFormat(L"Segoe Fluent Icons", nullptr,
+                                         DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+                                         DWRITE_FONT_STRETCH_NORMAL,
+                                         16.0f, L"", &iconFormat_);
 
         if (textFormat_) {
             textFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
@@ -2400,8 +2635,12 @@ class Renderer {
             smallTextFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
         }
         if (clockFormat_) {
+            clockFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
             clockFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             clockFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        }
+        if (iconFormat_) {
+            iconFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
         }
 
         return CreateBackingBitmap(520, 140);
@@ -2494,7 +2733,10 @@ class Renderer {
         target_.Reset();
         textFormat_.Reset();
         smallTextFormat_.Reset();
+        boldTextFormat_.Reset();
+        hugeTextFormat_.Reset();
         clockFormat_.Reset();
+        iconFormat_.Reset();
         dwriteFactory_.Reset();
         d2dFactory_.Reset();
 
@@ -2560,22 +2802,37 @@ class Renderer {
         textFormat_ = nullptr;
         smallTextFormat_ = nullptr;
         clockFormat_ = nullptr;
+        iconFormat_ = nullptr;
 
         dwriteFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr,
                                          DWRITE_FONT_WEIGHT_SEMI_BOLD,
                                          DWRITE_FONT_STYLE_NORMAL,
                                          DWRITE_FONT_STRETCH_NORMAL,
-                                         13.5f * scale, L"", &textFormat_);
+                                         13.5f, L"", &textFormat_);
         dwriteFactory_->CreateTextFormat(L"Segoe UI Variable Small", nullptr,
                                          DWRITE_FONT_WEIGHT_NORMAL,
                                          DWRITE_FONT_STYLE_NORMAL,
                                          DWRITE_FONT_STRETCH_NORMAL,
-                                         11.0f * scale, L"", &smallTextFormat_);
+                                         11.0f, L"", &smallTextFormat_);
         dwriteFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr,
                                          DWRITE_FONT_WEIGHT_BOLD,
                                          DWRITE_FONT_STYLE_NORMAL,
                                          DWRITE_FONT_STRETCH_NORMAL,
-                                         13.5f * scale, L"", &clockFormat_);
+                                         18.0f, L"", &clockFormat_);
+        dwriteFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr,
+                                         DWRITE_FONT_WEIGHT_BOLD,
+                                         DWRITE_FONT_STYLE_NORMAL,
+                                         DWRITE_FONT_STRETCH_NORMAL,
+                                         12.0f, L"", &boldTextFormat_);
+        dwriteFactory_->CreateTextFormat(L"Segoe UI Variable Display", nullptr,
+                                         DWRITE_FONT_WEIGHT_BOLD,
+                                         DWRITE_FONT_STYLE_NORMAL,
+                                         DWRITE_FONT_STRETCH_NORMAL,
+                                         42.0f, L"", &hugeTextFormat_);
+        dwriteFactory_->CreateTextFormat(L"Segoe Fluent Icons", nullptr,
+                                         DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+                                         DWRITE_FONT_STRETCH_NORMAL,
+                                         16.0f, L"", &iconFormat_);
 
         if (textFormat_) {
             textFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
@@ -2583,9 +2840,21 @@ class Renderer {
         if (smallTextFormat_) {
             smallTextFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
         }
+        if (boldTextFormat_) {
+            boldTextFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+            boldTextFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        }
+        if (hugeTextFormat_) {
+            hugeTextFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+            hugeTextFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        }
         if (clockFormat_) {
+            clockFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
             clockFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
             clockFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        }
+        if (iconFormat_) {
+            iconFormat_->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
         }
 
         lastFontScale_ = scale;
@@ -2619,7 +2888,7 @@ class Renderer {
         pillBgColor_ = settings.pillBgColor;
         pillBgColor_.a = 1.0f;
         
-        D2D1_COLOR_F tintColor = D2D1::ColorF(0.010f, 0.010f, 0.012f, settings.blurOpacity);
+        D2D1_COLOR_F tintColor = D2D1::ColorF(0.010f, 0.010f, 0.012f, settings.tintOpacity);
         if (!tintBrush_) target_->CreateSolidColorBrush(tintColor, &tintBrush_);
         else tintBrush_->SetColor(tintColor);
 
@@ -2635,7 +2904,7 @@ class Renderer {
         rect = D2D1::RectF(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f);
 
         float radius = settings.w11Style ? 8.0f * settings.sizeScale : (rect.bottom - rect.top) * 0.5f;
-        if (activity.kind == IslandKind::Media && !settings.w11Style) {
+        if (!settings.w11Style) {
             radius = std::min(radius, 44.0f * settings.sizeScale);
         }
         DrawSoftShadow(rect, radius);
@@ -2668,41 +2937,53 @@ class Renderer {
                 highlight.Get(), 1.0f);
         }
 
+        D2D1_MATRIX_3X2_F oldTransform;
+        target_->GetTransform(&oldTransform);
+        D2D1_POINT_2F pillCenter = D2D1::Point2F((rect.left + rect.right) * 0.5f, (rect.top + rect.bottom) * 0.5f);
+        target_->SetTransform(D2D1::Matrix3x2F::Scale(settings.sizeScale, settings.sizeScale, pillCenter) * oldTransform);
+
+        float invScale = 1.0f / settings.sizeScale;
+        float unW = (rect.right - rect.left) * invScale;
+        float unH = (rect.bottom - rect.top) * invScale;
+        D2D1_RECT_F unscaledRect = D2D1::RectF(pillCenter.x - unW * 0.5f, pillCenter.y - unH * 0.5f, pillCenter.x + unW * 0.5f, pillCenter.y + unH * 0.5f);
+
         switch (activity.kind) {
             case IslandKind::Media:
-                DrawMedia(state, rect, now);
+                DrawMedia(state, unscaledRect, now);
                 break;
             case IslandKind::Clipboard:
-                DrawClipboard(state, rect);
+                DrawClipboard(state, unscaledRect);
                 break;
             case IslandKind::Notification:
-                DrawNotification(state, rect);
+                DrawNotification(state, unscaledRect);
                 break;
             case IslandKind::Volume:
-                DrawVolume(state, rect);
+                DrawVolume(state, unscaledRect);
                 break;
             case IslandKind::CapsLock:
-                DrawCapsLock(state, rect);
+                DrawCapsLock(state, unscaledRect);
                 break;
             case IslandKind::Device:
-                DrawDevice(state, rect);
+                DrawDevice(state, unscaledRect);
                 break;
             case IslandKind::BatteryLow:
-                DrawBattery(state, rect);
+                DrawBattery(state, unscaledRect);
                 break;
             case IslandKind::Progress:
-                DrawProgress(state, rect);
+                DrawProgress(state, unscaledRect);
                 break;
             case IslandKind::Idle:
             default:
-                DrawIdleDashboard(state, rect, settings, now);
+                DrawIdleDashboard(state, unscaledRect, settings, now);
                 break;
         }
 
         // ── Apple-style privacy indicator dots ───────────────────────────────
         // Green dot = camera in use, Orange dot = mic in use.
         // Drawn in top-right corner of pill, outside content area.
-        DrawPrivacyDots(state, rect, now);
+        DrawPrivacyDots(state, unscaledRect, now);
+
+        target_->SetTransform(oldTransform);
     }
 
     void DrawSoftShadow(D2D1_RECT_F rect, float radius) {
@@ -2770,6 +3051,12 @@ class Renderer {
 
     void DrawPillSurface(D2D1_RECT_F rect, float radius, IslandKind kind, bool w11Style) {
         UNREFERENCED_PARAMETER(kind);
+
+        if (tintBrush_) {
+            target_->FillRoundedRectangle(D2D1::RoundedRect(rect, radius, radius),
+                                          tintBrush_.Get());
+        }
+
         // User-defined pill background color.
         ComPtr<ID2D1SolidColorBrush> blackBrush;
         D2D1_COLOR_F bg = pillBgColor_;
@@ -2836,101 +3123,238 @@ class Renderer {
         accentBrush_->SetOpacity(1.0f);
     }
 
+    static void GetWeatherIconAndText(int code, std::wstring& icon, std::wstring& text) {
+        switch (code) {
+            case 113: icon = L"☀️"; break;
+            case 116: icon = L"⛅"; break;
+            case 119: case 122: icon = L"☁️"; break;
+            case 143: case 248: case 260: icon = L"🌫️"; break;
+            case 200: case 386: case 389: case 392: case 395: icon = L"⛈️"; break;
+            case 176: case 263: case 266: case 281: case 284: case 293: case 296: case 299: case 302: case 305: case 308: case 311: case 314: case 353: case 356: case 359: icon = L"🌧️"; break;
+            case 179: case 182: case 185: case 227: case 230: case 317: case 320: case 323: case 326: case 329: case 332: case 335: case 338: case 350: case 362: case 365: case 368: case 371: icon = L"❄️"; break;
+            default: icon = L"🌡️"; break;
+        }
+    }
+
+    static int GetDaysInMonth(int year, int month) {
+        if (month == 2) {
+            bool leap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+            return leap ? 29 : 28;
+        }
+        if (month == 4 || month == 6 || month == 9 || month == 11) return 30;
+        return 31;
+    }
+
+    static int GetDayOfWeek(int year, int month, int day) {
+        if (month < 3) { month += 12; year -= 1; }
+        int k = year % 100;
+        int j = year / 100;
+        int h = (day + 13 * (month + 1) / 5 + k + k / 4 + j / 4 + 5 * j) % 7;
+        return (h + 6) % 7;
+    }
+
+
+
+    void DrawCalendarDashboard(const SharedState& state, D2D1_RECT_F rect, const Settings& settings, double now, float scale, SYSTEMTIME& local) {
+        ComPtr<ID2D1SolidColorBrush> calBg;
+        target_->CreateSolidColorBrush(D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.04f * settingsOpacity_), &calBg);
+        D2D1_RECT_F leftBlock = D2D1::RectF(rect.left + 22.0f * scale, rect.top + 16.0f * scale,
+                                            rect.left + 115.0f * scale, rect.bottom - 22.0f * scale);
+        target_->FillRoundedRectangle(D2D1::RoundedRect(leftBlock, 12.0f * scale, 12.0f * scale), calBg.Get());
+        
+        ComPtr<ID2D1SolidColorBrush> calHeader;
+        target_->CreateSolidColorBrush(D2D1::ColorF(0.85f, 0.25f, 0.20f, 0.9f * settingsOpacity_), &calHeader);
+        
+        wchar_t monthName[32] = {};
+        GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &local, L"MMMM", monthName, ARRAYSIZE(monthName), nullptr);
+        for (int i = 0; monthName[i]; ++i) monthName[i] = towupper(monthName[i]);
+        
+        target_->DrawTextW(monthName, static_cast<UINT32>(wcslen(monthName)), boldTextFormat_.Get(),
+                           D2D1::RectF(leftBlock.left, leftBlock.top + 6.0f * scale, leftBlock.right, leftBlock.top + 24.0f * scale),
+                           calHeader.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        wchar_t yearStr[16] = {};
+        swprintf_s(yearStr, L"%d", local.wYear);
+        mutedBrush_->SetOpacity(0.45f);
+        target_->DrawTextW(yearStr, static_cast<UINT32>(wcslen(yearStr)), boldTextFormat_.Get(),
+                           D2D1::RectF(leftBlock.left, leftBlock.top + 20.0f * scale, leftBlock.right, leftBlock.top + 38.0f * scale),
+                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        wchar_t dayStr[16] = {};
+        swprintf_s(dayStr, L"%d", local.wDay);
+        textBrush_->SetOpacity(0.96f);
+        target_->DrawTextW(dayStr, static_cast<UINT32>(wcslen(dayStr)), hugeTextFormat_.Get(),
+                           D2D1::RectF(leftBlock.left, leftBlock.top + 30.0f * scale, leftBlock.right, leftBlock.top + 80.0f * scale),
+                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        wchar_t weekdayName[32] = {};
+        GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &local, L"dddd", weekdayName, ARRAYSIZE(weekdayName), nullptr);
+        mutedBrush_->SetOpacity(0.75f);
+        target_->DrawTextW(weekdayName, static_cast<UINT32>(wcslen(weekdayName)), boldTextFormat_.Get(),
+                           D2D1::RectF(leftBlock.left, leftBlock.bottom - 22.0f * scale, leftBlock.right, leftBlock.bottom),
+                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        // Right Grid
+        const float gridStart = rect.left + 144.0f * scale;
+        const float gridTop = rect.top + 30.0f * scale;
+        const float colW = 31.0f * scale;
+        const float rowH = 18.0f * scale;
+        const wchar_t* days[] = {L"S", L"M", L"T", L"W", L"T", L"F", L"S"};
+        
+        for (int i = 0; i < 7; ++i) {
+            D2D1_RECT_F cell = D2D1::RectF(gridStart + i * colW, gridTop, gridStart + (i+1)*colW, gridTop + rowH);
+            ComPtr<ID2D1SolidColorBrush> brush = (i == 0 || i == 6) ? calHeader : mutedBrush_;
+            target_->DrawTextW(days[i], 1, boldTextFormat_.Get(), cell, brush.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+        }
+
+        int startDay = GetDayOfWeek(local.wYear, local.wMonth, 1);
+        int totalDays = GetDaysInMonth(local.wYear, local.wMonth);
+        
+        int row = 1;
+        int col = startDay;
+        textBrush_->SetOpacity(0.85f);
+        for (int d = 1; d <= totalDays; ++d) {
+            D2D1_RECT_F cell = D2D1::RectF(gridStart + col * colW, gridTop + row * rowH + 4.0f * scale, 
+                                           gridStart + (col+1)*colW, gridTop + (row+1)*rowH + 4.0f * scale);
+            
+            if (d == local.wDay) {
+                target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(cell.left + colW*0.5f, cell.top + rowH*0.5f), 10.0f*scale, 10.0f*scale), calHeader.Get());
+                target_->DrawTextW(std::to_wstring(d).c_str(), static_cast<UINT32>(std::to_wstring(d).length()), boldTextFormat_.Get(), cell, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+            } else {
+                ComPtr<ID2D1SolidColorBrush> dBrush = (col == 0 || col == 6) ? calHeader : textBrush_;
+                if (col == 0 || col == 6) dBrush->SetOpacity(0.6f);
+                target_->DrawTextW(std::to_wstring(d).c_str(), static_cast<UINT32>(std::to_wstring(d).length()), boldTextFormat_.Get(), cell, dBrush.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+            }
+            
+            col++;
+            if (col > 6) { col = 0; row++; }
+        }
+    }
+
+    void DrawWeatherDashboard(const SharedState& state, D2D1_RECT_F rect, const Settings& settings, double now, float scale, bool hasWeather, const std::wstring& wIcon, const std::wstring& wText) {
+        wchar_t wTemp[32] = {};
+        if (hasWeather) swprintf_s(wTemp, L"%.0f\x00B0", state.weather.temperature);
+        else wcscpy_s(wTemp, L"--\x00B0");
+
+        textBrush_->SetOpacity(0.96f);
+        target_->DrawTextW(wIcon.c_str(), static_cast<UINT32>(wIcon.length()), hugeTextFormat_.Get(),
+                           D2D1::RectF(rect.left + 20.0f * scale, rect.top + 34.0f * scale, rect.left + 100.0f * scale, rect.bottom),
+                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           
+        target_->DrawTextW(wTemp, static_cast<UINT32>(wcslen(wTemp)), hugeTextFormat_.Get(),
+                           D2D1::RectF(rect.left + 85.0f * scale, rect.top + 34.0f * scale, rect.left + 180.0f * scale, rect.bottom),
+                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        ComPtr<ID2D1SolidColorBrush> divider;
+        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.12f * settingsOpacity_), &divider);
+        target_->FillRoundedRectangle(
+            D2D1::RoundedRect(D2D1::RectF(rect.left + 185.0f * scale, rect.top + 20.0f * scale,
+                                           rect.left + 186.5f * scale, rect.bottom - 24.0f * scale),
+                              0.5f * scale, 0.5f * scale), divider.Get());
+
+        std::wstring city = hasWeather ? state.weather.city : L"Locating...";
+        std::wstring desc = wText;
+        
+        D2D1_RECT_F rightTop = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 28.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(city.c_str(), static_cast<UINT32>(city.length()), boldTextFormat_.Get(),
+                           rightTop, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           
+        mutedBrush_->SetOpacity(0.70f);
+        D2D1_RECT_F rightMid = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 48.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(desc.c_str(), static_cast<UINT32>(desc.length()), smallTextFormat_.Get(),
+                           rightMid, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           
+        std::wstring line3 = hasWeather ? L"Wind: " + state.weather.windSpeed + L" km/h " + state.weather.windDir : L"Updated recently";
+        std::wstring line4 = hasWeather ? L"Feels Like: " + state.weather.feelsLike + L"\x00B0" : L"";
+        std::wstring line5 = hasWeather ? L"Humidity: " + state.weather.humidity + L"%" : L"";
+
+        D2D1_RECT_F rightLine3 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 68.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line3.c_str(), static_cast<UINT32>(line3.length()), smallTextFormat_.Get(),
+                           rightLine3, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           
+        D2D1_RECT_F rightLine4 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 88.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line4.c_str(), static_cast<UINT32>(line4.length()), smallTextFormat_.Get(),
+                           rightLine4, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           
+        D2D1_RECT_F rightLine5 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 108.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line5.c_str(), static_cast<UINT32>(line5.length()), smallTextFormat_.Get(),
+                           rightLine5, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+    }
+
     void DrawIdleDashboard(const SharedState& state, D2D1_RECT_F rect, const Settings& settings,
                            double now) {
         if (settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0) {
-            DrawGameOverlay(state, rect, settings.sizeScale);
+            DrawGameOverlay(state, rect, 1.0f);
             return;
         }
-
-        if (!settings.alwaysShowClock || !clockFormat_) {
-            return;
-        }
+        if (!settings.alwaysShowClock || !clockFormat_) return;
 
         SYSTEMTIME local = {};
         GetLocalTime(&local);
-        wchar_t buffer[32] = {};
-        GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, nullptr, buffer,
-                        ARRAYSIZE(buffer));
+        wchar_t timeBuf[32] = {};
+        GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, nullptr, timeBuf, ARRAYSIZE(timeBuf));
 
-        const float scale = settings.sizeScale;
+        const float scale = 1.0f;
         const float width = rect.right - rect.left;
-        if (width / scale < 190.0f) {
-            const int page = static_cast<int>(now / 4.0) % 6;
-            wchar_t label[64] = {};
-            switch (page) {
-                case 1:
-                    GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &local, L"ddd d",
-                                    label, ARRAYSIZE(label), nullptr);
-                    break;
-                case 2:
-                    swprintf_s(label, L"%s %d%%",
-                               state.system.volumeMuted ? L"Muted" : L"Vol",
-                               state.system.volumePercent);
-                    break;
-                case 3:
-                    swprintf_s(label, L"CPU %d%%", state.system.cpuPercent);
-                    break;
-                case 4:
-                    swprintf_s(label, L"RAM %d%%", state.system.memoryPercent);
-                    break;
-                case 5:
-                    swprintf_s(label, L"Disk %d%% free", state.system.diskFreePercent);
-                    break;
-                default:
-                    wcscpy_s(label, ARRAYSIZE(label), buffer);
-                    break;
-            }
+        
+        bool hasWeather = state.weather.hasData && (now - state.weather.lastUpdated < 3600.0);
+        std::wstring wIcon = L"🌡️";
+        std::wstring wText = L"Loading...";
+        if (hasWeather) {
+            wText = state.weather.weatherDesc;
+            GetWeatherIconAndText(state.weather.weatherCode, wIcon, wText);
+        }
 
-            mutedBrush_->SetOpacity(0.72f);
-            target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), clockFormat_.Get(), rect,
-                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
-            mutedBrush_->SetOpacity(0.58f);
-            DrawPageDots(rect, page, 6, scale);
+        if (width / scale < 220.0f) {
+            // Collapsed Mode
+            D2D1_RECT_F timeRect = D2D1::RectF(rect.left + 20.0f * scale, rect.top + 7.0f * scale,
+                                               rect.left + 80.0f * scale, rect.bottom - 7.0f * scale);
+            textBrush_->SetOpacity(0.96f);
+            target_->DrawTextW(timeBuf, static_cast<UINT32>(wcslen(timeBuf)), smallTextFormat_.Get(),
+                               timeRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+            
+            ComPtr<ID2D1SolidColorBrush> divider;
+            target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.12f * settingsOpacity_), &divider);
+            target_->FillRoundedRectangle(
+                D2D1::RoundedRect(D2D1::RectF(rect.left + 82.0f * scale, rect.top + 10.0f * scale,
+                                               rect.left + 83.5f * scale, rect.bottom - 10.0f * scale),
+                                  0.5f * scale, 0.5f * scale), divider.Get());
+
+            wchar_t weatherLabel[32] = {};
+            if (hasWeather) swprintf_s(weatherLabel, L"%s %.0f\x00B0", wIcon.c_str(), state.weather.temperature);
+            else wcscpy_s(weatherLabel, ARRAYSIZE(weatherLabel), L"🌡️ --\x00B0");
+
+            D2D1_RECT_F wRect = D2D1::RectF(rect.left + 94.0f * scale, rect.top + 7.0f * scale,
+                                            rect.right, rect.bottom - 7.0f * scale);
+            target_->DrawTextW(weatherLabel, static_cast<UINT32>(wcslen(weatherLabel)), smallTextFormat_.Get(),
+                               wRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+            textBrush_->SetOpacity(1.0f);
             return;
         }
 
-        D2D1_RECT_F timeRect = D2D1::RectF(rect.left + 18.0f * scale, rect.top + 10.0f * scale,
-                                           rect.left + 104.0f * scale, rect.top + 31.0f * scale);
-        textBrush_->SetOpacity(0.94f);
-        target_->DrawTextW(buffer, static_cast<UINT32>(wcslen(buffer)), clockFormat_.Get(),
-                           timeRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
-        textBrush_->SetOpacity(0.90f);
+        // Expanded Mode
+        int tab = g_idleTab % 2;
+        if (tab < 0) tab += 2;
 
-        wchar_t date[64] = {};
-        GetDateFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &local, L"ddd, MMM d",
-                        date, ARRAYSIZE(date), nullptr);
-        D2D1_RECT_F dateRect = D2D1::RectF(rect.left + 20.0f * scale, rect.top + 31.0f * scale,
-                                           rect.left + 118.0f * scale, rect.bottom - 8.0f * scale);
-        mutedBrush_->SetOpacity(0.50f);
-        target_->DrawTextW(date, static_cast<UINT32>(wcslen(date)), smallTextFormat_.Get(),
-                           dateRect, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+        if (tab == 0) DrawCalendarDashboard(state, rect, settings, now, scale, local);
+        else DrawWeatherDashboard(state, rect, settings, now, scale, hasWeather, wIcon, wText);
 
-        ComPtr<ID2D1SolidColorBrush> divider;
-        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.075f * settingsOpacity_), &divider);
-        target_->FillRoundedRectangle(
-            D2D1::RoundedRect(D2D1::RectF(rect.left + 126.0f * scale, rect.top + 14.0f * scale,
-                                           rect.left + 127.0f * scale, rect.bottom - 14.0f * scale),
-                              0.5f * scale, 0.5f * scale),
-            divider.Get());
+        // Pagination dots (Vertical on the right edge)
+        const float dotX = rect.right - 10.0f * scale;
+        const float dotY = (rect.top + rect.bottom) * 0.5f;
+        const float spacing = 8.0f * scale;
+        const float r = 2.5f * scale;
+        
+        ComPtr<ID2D1SolidColorBrush> activeDot, inactiveDot;
+        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.85f * settingsOpacity_), &activeDot);
+        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.25f * settingsOpacity_), &inactiveDot);
 
-        const float chipTop = rect.top + 11.0f * scale;
-        const float cardW = 58.0f * scale;
-        const float gap = 7.0f * scale;
-        const float start = rect.right - 18.0f * scale - cardW * 3.0f - gap * 2.0f;
-        DrawMetricChip(state, D2D1::RectF(start, chipTop, start + cardW, rect.bottom - 10.0f * scale),
-                       state.system.charging ? L"CHG" : L"BAT", state.battery.percent, 1);
-        DrawMetricChip(state, D2D1::RectF(start + cardW + gap, chipTop,
-                                   start + cardW * 2.0f + gap, rect.bottom - 10.0f * scale),
-                       state.system.volumeMuted ? L"MUT" : L"VOL", state.system.volumePercent, 2);
-        DrawMetricChip(state, D2D1::RectF(start + cardW * 2.0f + gap * 2.0f, chipTop,
-                                   start + cardW * 3.0f + gap * 2.0f, rect.bottom - 10.0f * scale),
-                       L"CPU", state.system.cpuPercent, 3);
-
-        mutedBrush_->SetOpacity(0.58f);
+        target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY - spacing * 0.5f), r, r), tab == 0 ? activeDot.Get() : inactiveDot.Get());
+        target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY + spacing * 0.5f), r, r), tab == 1 ? activeDot.Get() : inactiveDot.Get());
     }
 
-    void DrawGameOverlay(const SharedState& state, D2D1_RECT_F rect, float scale) {
+    void DrawGameOverlay(const SharedState& state, D2D1_RECT_F rect, float unused_scale) {
+        const float scale = 1.0f;
         ComPtr<ID2D1SolidColorBrush> panelBrush;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.080f * settingsOpacity_), &panelBrush);
 
@@ -2980,7 +3404,8 @@ class Renderer {
         mutedBrush_->SetOpacity(0.58f);
     }
 
-    void DrawGameMetricCard(D2D1_RECT_F rect, const wchar_t* label, int percent, int iconKind, float scale) {
+    void DrawGameMetricCard(D2D1_RECT_F rect, const wchar_t* label, int percent, int iconKind, float unused_scale) {
+        const float scale = 1.0f;
         D2D1_COLOR_F metricColor = D2D1::ColorF(0.0f, 0.82f, 1.0f, 1.0f);
         switch (iconKind) {
             case 1:
@@ -3050,7 +3475,8 @@ class Renderer {
         metricBrush->SetOpacity(1.0f);
     }
 
-    void DrawGameIcon(D2D1_POINT_2F center, float radius, int kind, ID2D1SolidColorBrush* customBrush = nullptr, float scale = 1.0f) {
+    void DrawGameIcon(D2D1_POINT_2F center, float radius, int kind, ID2D1SolidColorBrush* customBrush = nullptr, float unused_scale = 1.0f) {
+        const float scale = 1.0f;
         ID2D1SolidColorBrush* brush = customBrush ? customBrush : accentBrush_.Get();
         brush->SetOpacity(0.88f);
         switch (kind) {
@@ -3167,7 +3593,8 @@ class Renderer {
         brush->SetOpacity(1.0f);
     }
 
-    void DrawPageDots(D2D1_RECT_F rect, int active, int count, float scale) {
+    void DrawPageDots(D2D1_RECT_F rect, int active, int count, float unused_scale) {
+        const float scale = 1.0f;
         const float gap = 6.0f * scale;
         const float total = count * 3.0f * scale + (count - 1) * gap;
         const float start = (rect.left + rect.right - total) * 0.5f;
@@ -3183,7 +3610,7 @@ class Renderer {
     }
 
     void DrawMetricChip(const SharedState& state, D2D1_RECT_F rect, const wchar_t* label, int percent, int iconKind) {
-        const float scale = g_settings.sizeScale;
+        const float scale = 1.0f;
         D2D1_COLOR_F metricColor = D2D1::ColorF(0.0f, 0.82f, 1.0f, 1.0f);
         switch (iconKind) {
             case 1: {
@@ -3432,94 +3859,125 @@ class Renderer {
         if (expandedAlpha > 0.01f && mask && layer) {
             target_->PushLayer(D2D1::LayerParameters(rect, mask.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), expandedAlpha, nullptr, D2D1_LAYER_OPTIONS_NONE), layer.Get());
             
-            // Expanded Apple DI media: large square art on left, text center.
-            const float artSize = 64.0f;
-            D2D1_RECT_F artRect = D2D1::RectF(rect.left + 24.0f, rect.top + 20.0f,
-                                              rect.left + 24.0f + artSize, rect.top + 20.0f + artSize);
-            DrawAlbumArt(state.media, artRect, now, 16.0f, true);
+            int tab = g_idleTab % 3;
+            if (tab < 0) tab += 3;
 
-            const float waveW = 32.0f;
-            const float waveH = 20.0f;
-            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - waveW,
-                                               rect.top + 20.0f + (artSize - waveH) * 0.5f,
-                                               rect.right - 24.0f,
-                                               rect.top + 20.0f + (artSize + waveH) * 0.5f);
+            if (tab == 0) {
+                // Expanded Apple DI media: large square art on left, text center.
+                const float artSize = 64.0f;
+                D2D1_RECT_F artRect = D2D1::RectF(rect.left + 24.0f, rect.top + 20.0f,
+                                                  rect.left + 24.0f + artSize, rect.top + 20.0f + artSize);
+                DrawAlbumArt(state.media, artRect, now, 16.0f, true);
 
-            const float textLeft = artRect.right + 18.0f;
-            const float textRight = waveRect.left - 16.0f;
-            
-            // Title — bold, prominent.
-            D2D1_RECT_F titleRect = D2D1::RectF(textLeft, rect.top + 34.0f, textRight, rect.top + 54.0f);
-            DrawMarqueeText(state.media.title.empty() ? L"Unknown" : state.media.title,
-                            titleRect, textFormat_.Get(), textBrush_.Get(), now, 42.0f);
+                const float waveW = 32.0f;
+                const float waveH = 20.0f;
+                D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - waveW,
+                                                   rect.top + 20.0f + (artSize - waveH) * 0.5f,
+                                                   rect.right - 24.0f,
+                                                   rect.top + 20.0f + (artSize + waveH) * 0.5f);
 
-            // Artist — muted below title.
-            D2D1_RECT_F artistRect = D2D1::RectF(textLeft, rect.top + 54.0f, textRight, rect.top + 74.0f);
-            mutedBrush_->SetOpacity(0.55f);
-            DrawMarqueeText(state.media.artist.empty() ? L"" : state.media.artist,
-                            artistRect, smallTextFormat_.Get(), mutedBrush_.Get(), now, 30.0f);
-            mutedBrush_->SetOpacity(0.50f);
+                const float textLeft = artRect.right + 18.0f;
+                const float textRight = waveRect.left - 16.0f;
+                
+                // Title — bold, prominent.
+                D2D1_RECT_F titleRect = D2D1::RectF(textLeft, rect.top + 34.0f, textRight, rect.top + 54.0f);
+                DrawMarqueeText(state.media.title.empty() ? L"Unknown" : state.media.title,
+                                titleRect, textFormat_.Get(), textBrush_.Get(), now, 42.0f);
 
-            if (state.media.playing) {
-                DrawWaveform(state, waveRect);
-            } else {
-                mutedBrush_->SetOpacity(0.5f);
-                for (int i = 0; i < 4; ++i) {
-                    target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 4.0f + 2.0f, (waveRect.top + waveRect.bottom) * 0.5f), 1.2f, 1.2f), mutedBrush_.Get());
+                // Artist — muted below title.
+                D2D1_RECT_F artistRect = D2D1::RectF(textLeft, rect.top + 54.0f, textRight, rect.top + 74.0f);
+                mutedBrush_->SetOpacity(0.55f);
+                DrawMarqueeText(state.media.artist.empty() ? L"" : state.media.artist,
+                                artistRect, smallTextFormat_.Get(), mutedBrush_.Get(), now, 30.0f);
+                mutedBrush_->SetOpacity(0.50f);
+
+                if (state.media.playing) {
+                    DrawWaveform(state, waveRect);
+                } else {
+                    mutedBrush_->SetOpacity(0.5f);
+                    for (int i = 0; i < 4; ++i) {
+                        target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 4.0f + 2.0f, (waveRect.top + waveRect.bottom) * 0.5f), 1.2f, 1.2f), mutedBrush_.Get());
+                    }
                 }
+
+                // Timeline (Scrubber)
+                const float scrubberY = rect.top + 114.0f;
+                double currentPosition = state.media.positionTicks / 10000000.0;
+                double duration = state.media.endTicks / 10000000.0;
+                if (state.media.playing && state.media.lastUpdatedTicks > 0) {
+                    currentPosition += (GetTickCount64() - state.media.lastUpdatedTicks) / 1000.0;
+                }
+                currentPosition = std::max(0.0, std::min(currentPosition, duration));
+
+                auto FormatTime = [](double seconds) -> std::wstring {
+                    if (seconds <= 0.0 || _isnan(seconds)) return L"0:00";
+                    int m = static_cast<int>(seconds) / 60;
+                    int s = static_cast<int>(seconds) % 60;
+                    wchar_t buf[16];
+                    swprintf_s(buf, L"%d:%02d", m, s);
+                    return buf;
+                };
+
+                std::wstring elapsedStr = FormatTime(currentPosition);
+                std::wstring remainStr = L"-" + FormatTime(duration - currentPosition);
+
+                const float scrubLeft = rect.left + 24.0f;
+                const float scrubRight = rect.right - 24.0f;
+                
+                mutedBrush_->SetOpacity(0.8f);
+                D2D1_RECT_F elRect = D2D1::RectF(scrubLeft, scrubberY - 8.0f, scrubLeft + 40.0f, scrubberY + 8.0f);
+                target_->DrawTextW(elapsedStr.c_str(), static_cast<UINT32>(elapsedStr.size()), smallTextFormat_.Get(), elRect, mutedBrush_.Get());
+                
+                D2D1_RECT_F remRect = D2D1::RectF(scrubRight - 36.0f, scrubberY - 8.0f, scrubRight, scrubberY + 8.0f);
+                target_->DrawTextW(remainStr.c_str(), static_cast<UINT32>(remainStr.size()), smallTextFormat_.Get(), remRect, mutedBrush_.Get());
+
+                const float barLeft = scrubLeft + 36.0f;
+                const float barRight = scrubRight - 38.0f;
+                const float progress = duration > 0.0 ? static_cast<float>(currentPosition / duration) : 0.0f;
+
+                ComPtr<ID2D1SolidColorBrush> scrubBg;
+                target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.15f), &scrubBg);
+                target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barRight, scrubberY + 2.5f), 2.5f, 2.5f), scrubBg.Get());
+
+                ComPtr<ID2D1SolidColorBrush> scrubFg;
+                target_->CreateSolidColorBrush(state.media.art.bgra.empty() ? D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.9f) : state.media.art.sampledAccent, &scrubFg);
+                const float scrubW = (barRight - barLeft) * progress;
+                target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barLeft + scrubW, scrubberY + 2.5f), 2.5f, 2.5f), scrubFg.Get());
+
+                // Controls
+                const float cy = rect.top + 148.0f;
+                const float cx = (rect.left + rect.right) * 0.5f;
+                DrawMediaControls(state.media.playing, 
+                                  D2D1::Point2F(cx - 64.0f, cy),
+                                  D2D1::Point2F(cx, cy),
+                                  D2D1::Point2F(cx + 64.0f, cy));
+            } else if (tab == 1) {
+                SYSTEMTIME local = {}; GetLocalTime(&local);
+                DrawCalendarDashboard(state, rect, g_settings, now, 1.0f, local);
+            } else if (tab == 2) {
+                bool hasWeather = state.weather.hasData && (now - state.weather.lastUpdated < 3600.0);
+                std::wstring wIcon = L"🌡️"; std::wstring wText = L"Loading...";
+                if (hasWeather) {
+                    wText = state.weather.weatherDesc;
+                    GetWeatherIconAndText(state.weather.weatherCode, wIcon, wText);
+                }
+                DrawWeatherDashboard(state, rect, g_settings, now, 1.0f, hasWeather, wIcon, wText);
             }
 
-            // Timeline (Scrubber)
-            const float scrubberY = rect.top + 114.0f;
-            double currentPosition = state.media.positionTicks / 10000000.0;
-            double duration = state.media.endTicks / 10000000.0;
-            if (state.media.playing && state.media.lastUpdatedTicks > 0) {
-                currentPosition += (GetTickCount64() - state.media.lastUpdatedTicks) / 1000.0;
-            }
-            currentPosition = std::max(0.0, std::min(currentPosition, duration));
-
-            auto FormatTime = [](double seconds) -> std::wstring {
-                if (seconds <= 0.0 || _isnan(seconds)) return L"0:00";
-                int m = static_cast<int>(seconds) / 60;
-                int s = static_cast<int>(seconds) % 60;
-                wchar_t buf[16];
-                swprintf_s(buf, L"%d:%02d", m, s);
-                return buf;
-            };
-
-            std::wstring elapsedStr = FormatTime(currentPosition);
-            std::wstring remainStr = L"-" + FormatTime(duration - currentPosition);
-
-            const float scrubLeft = rect.left + 24.0f;
-            const float scrubRight = rect.right - 24.0f;
+            // Pagination dots (Vertical on the right edge)
+            const float scale = 1.0f;
+            const float dotX = rect.right - 10.0f * scale;
+            const float dotY = (rect.top + rect.bottom) * 0.5f;
+            const float spacing = 8.0f * scale;
+            const float r = 2.5f * scale;
             
-            mutedBrush_->SetOpacity(0.8f);
-            D2D1_RECT_F elRect = D2D1::RectF(scrubLeft, scrubberY - 8.0f, scrubLeft + 40.0f, scrubberY + 8.0f);
-            target_->DrawTextW(elapsedStr.c_str(), static_cast<UINT32>(elapsedStr.size()), smallTextFormat_.Get(), elRect, mutedBrush_.Get());
-            
-            D2D1_RECT_F remRect = D2D1::RectF(scrubRight - 36.0f, scrubberY - 8.0f, scrubRight, scrubberY + 8.0f);
-            target_->DrawTextW(remainStr.c_str(), static_cast<UINT32>(remainStr.size()), smallTextFormat_.Get(), remRect, mutedBrush_.Get());
+            ComPtr<ID2D1SolidColorBrush> activeDot, inactiveDot;
+            target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.85f * settingsOpacity_), &activeDot);
+            target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.25f * settingsOpacity_), &inactiveDot);
 
-            const float barLeft = scrubLeft + 36.0f;
-            const float barRight = scrubRight - 38.0f;
-            const float progress = duration > 0.0 ? static_cast<float>(currentPosition / duration) : 0.0f;
-
-            ComPtr<ID2D1SolidColorBrush> scrubBg;
-            target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.15f), &scrubBg);
-            target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barRight, scrubberY + 2.5f), 2.5f, 2.5f), scrubBg.Get());
-
-            ComPtr<ID2D1SolidColorBrush> scrubFg;
-            target_->CreateSolidColorBrush(state.media.art.bgra.empty() ? D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.9f) : state.media.art.sampledAccent, &scrubFg);
-            const float scrubW = (barRight - barLeft) * progress;
-            target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barLeft + scrubW, scrubberY + 2.5f), 2.5f, 2.5f), scrubFg.Get());
-
-            // Controls
-            const float cy = rect.top + 148.0f;
-            const float cx = (rect.left + rect.right) * 0.5f;
-            DrawMediaControls(state.media.playing, 
-                              D2D1::Point2F(cx - 64.0f, cy),
-                              D2D1::Point2F(cx, cy),
-                              D2D1::Point2F(cx + 64.0f, cy));
+            target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY - spacing), r, r), tab == 0 ? activeDot.Get() : inactiveDot.Get());
+            target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY), r, r), tab == 1 ? activeDot.Get() : inactiveDot.Get());
+            target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY + spacing), r, r), tab == 2 ? activeDot.Get() : inactiveDot.Get());
 
             target_->PopLayer();
         }
@@ -3529,15 +3987,15 @@ class Renderer {
             target_->PushLayer(D2D1::LayerParameters(rect, mask.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), collapsedAlpha, nullptr, D2D1_LAYER_OPTIONS_NONE), layer.Get());
             
             const float cy = (rect.top + rect.bottom) * 0.5f;
-            const float artPadding = 4.0f;
-            const float artSize = 36.0f - artPadding * 2.0f; // Fixed size based on default 36.0f height
+            const float artPadding = 6.0f;
+            const float artSize = height - artPadding * 2.0f;
             
-            D2D1_RECT_F artRect = D2D1::RectF(rect.left + 6.0f, cy - artSize * 0.5f,
-                                              rect.left + 6.0f + artSize, cy + artSize * 0.5f);
+            D2D1_RECT_F artRect = D2D1::RectF(rect.left + 8.0f, cy - artSize * 0.5f,
+                                              rect.left + 8.0f + artSize, cy + artSize * 0.5f);
             DrawAlbumArt(state.media, artRect, now, artSize * 0.5f, false);
 
-            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 34.0f, cy - 8.0f,
-                                               rect.right - 10.0f, cy + 8.0f);
+            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 42.0f, cy - 10.0f,
+                                               rect.right - 14.0f, cy + 10.0f);
             if (state.media.playing) {
                 DrawWaveform(state, waveRect);
             } else {
@@ -3831,8 +4289,8 @@ class Renderer {
                                     clipboardIconGeneration_, 0.96f);
         } else {
             // Fallback icon when no app icon is available.
-            // Use a camera glyph for images, clipboard glyph for text.
-            const wchar_t* glyph = state.clipboard.image ? L"\U0001F4F7" : L"\u2398";
+            // Use Segoe Fluent Icons for a native Windows 11 look.
+            const wchar_t* glyph = state.clipboard.image ? L"\uE114" : L"\uE8C8";
             // For image: show a bright gradient-style photo icon placeholder.
             ComPtr<ID2D1SolidColorBrush> iconBg;
             const D2D1_COLOR_F iconColor = state.clipboard.image
@@ -3841,10 +4299,18 @@ class Renderer {
             target_->CreateSolidColorBrush(iconColor, &iconBg);
             target_->FillRoundedRectangle(D2D1::RoundedRect(badge, 13, 13), iconBg.Get());
             textBrush_->SetOpacity(0.95f);
-            // Draw glyph centered in badge; use smallTextFormat for emoji fallback.
-            target_->DrawTextW(glyph,
-                               static_cast<UINT32>(wcslen(glyph)), textFormat_.Get(), badge,
-                               textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+            
+            // Draw glyph perfectly centered in the badge rectangle.
+            if (iconFormat_) {
+                iconFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                iconFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                target_->DrawTextW(glyph,
+                                   static_cast<UINT32>(wcslen(glyph)), iconFormat_.Get(), badge,
+                                   textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                iconFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                iconFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+            }
+            
             textBrush_->SetOpacity(0.90f);
         }
 
@@ -3947,10 +4413,19 @@ class Renderer {
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.12f), &badgeBg);
         target_->FillRoundedRectangle(D2D1::RoundedRect(badge, br, br), badgeBg.Get());
 
-        const wchar_t* glyph = muted ? L"\u00d7" : L"\u266b";
+        const wchar_t* glyph = muted ? L"\uE74F" : L"\uE993"; // Mute and Volume2 from Segoe Fluent Icons
         textBrush_->SetOpacity(0.95f);
-        target_->DrawTextW(glyph, static_cast<UINT32>(wcslen(glyph)), textFormat_.Get(), badge,
-                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        
+        if (iconFormat_) {
+            iconFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+            iconFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            
+            target_->DrawTextW(glyph, static_cast<UINT32>(wcslen(glyph)), iconFormat_.Get(), badge,
+                               textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                               
+            iconFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+            iconFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        }
 
         const float tx = badge.right + 14;
         D2D1_RECT_F labelRect = D2D1::RectF(tx, cy - 22, rect.right - 58, cy - 6);
@@ -4291,7 +4766,10 @@ class Renderer {
     ComPtr<IDWriteFactory> dwriteFactory_;
     ComPtr<IDWriteTextFormat> textFormat_;
     ComPtr<IDWriteTextFormat> smallTextFormat_;
+    ComPtr<IDWriteTextFormat> boldTextFormat_;
+    ComPtr<IDWriteTextFormat> hugeTextFormat_;
     ComPtr<IDWriteTextFormat> clockFormat_;
+    ComPtr<IDWriteTextFormat> iconFormat_;
     ComPtr<ID2D1SolidColorBrush> accentBrush_;
     ComPtr<ID2D1SolidColorBrush> redBrush_;
     ComPtr<ID2D1SolidColorBrush> textBrush_;
@@ -4316,8 +4794,8 @@ Activity ActivityForKind(IslandKind kind, const Settings& settings) {
 
     switch (kind) {
         case IslandKind::Media:
-            activity.width = 110.0f;
-            activity.height = 36.0f;
+            activity.width = 150.0f;
+            activity.height = 44.0f;
             break;
         case IslandKind::Progress:
             activity.width = 230.0f;
@@ -4353,7 +4831,7 @@ Activity ActivityForKind(IslandKind kind, const Settings& settings) {
                 activity.width = 0.0f;
                 activity.height = 0.0f;
             } else {
-                activity.width = 120.0f;
+                activity.width = 170.0f;
                 activity.height = 36.0f;
             }
             break;
@@ -4493,9 +4971,11 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 int xPos = GET_X_LPARAM(lParam);
                 int yPos = GET_Y_LPARAM(lParam);
                 bool mediaActive = false;
+                std::vector<IslandKind> kinds;
                 {
                     std::lock_guard lock(g_stateMutex);
                     mediaActive = g_settings.media && g_state.media.available;
+                    kinds = ChooseActivities(g_state, g_settings, NowSeconds());
                 }
 
                 RECT clientRect;
@@ -4549,9 +5029,19 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                 }
 
                 if (mediaActive) {
-                    OpenRelevantApp();
+                    if (height > 45.0f && xPos > width - 30.0f) {
+                        // Clicked on the right edge scroll area in Media
+                        g_idleTab = (g_idleTab + 1) % 3;
+                    } else {
+                        OpenRelevantApp();
+                    }
                 } else {
-                    HandleStatusClickAtPoint(hwnd, lParam);
+                    if (!kinds.empty() && kinds[0] == IslandKind::Idle && height > 45.0f) {
+                        if (xPos < width / 2.0f) g_idleTab = (g_idleTab - 1 + 2) % 2;
+                        else g_idleTab = (g_idleTab + 1) % 2;
+                    } else {
+                        HandleStatusClickAtPoint(hwnd, lParam);
+                    }
                 }
             }
             return 0;
@@ -4563,6 +5053,24 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_LBUTTONDBLCLK:
             Wh_SetIntValue(L"PinnedExpanded", Wh_GetIntValue(L"PinnedExpanded", 0) ? 0 : 1);
             return 0;
+
+        case WM_MOUSEWHEEL: {
+            static ULONGLONG lastScrollTime = 0;
+            ULONGLONG now = GetTickCount64();
+            if (now - lastScrollTime < 300) return 0; // 300ms debounce
+            lastScrollTime = now;
+
+            bool mediaActive = false;
+            {
+                std::lock_guard lock(g_stateMutex);
+                mediaActive = g_settings.media && g_state.media.available;
+            }
+            int tabCount = mediaActive ? 3 : 2;
+            int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+            if (delta > 0) g_idleTab = (g_idleTab - 1 + tabCount) % tabCount;
+            else if (delta < 0) g_idleTab = (g_idleTab + 1) % tabCount;
+            return 0;
+        }
 
         case WM_RBUTTONUP: {
             POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
@@ -4719,8 +5227,8 @@ DWORD WINAPI RenderThreadProc(void*) {
         const bool hover = PtInRect(&windowRect, cursor) != FALSE;
 
         if (primary.kind == IslandKind::Idle && (pinned || (hover && g_settings.alwaysShowClock))) {
-            primary.width = 336.0f * g_settings.sizeScale;
-            primary.height = 58.0f * g_settings.sizeScale;
+            primary.width = 380.0f * g_settings.sizeScale;
+            primary.height = 184.0f * g_settings.sizeScale;
         }
         if (primary.kind == IslandKind::Idle &&
             (g_settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0)) {
@@ -4775,19 +5283,19 @@ DWORD WINAPI RenderThreadProc(void*) {
             heightDamping = 28.0f;
         }
 
-        widthSpring.Step(dt, widthStiffness * speed, widthDamping * speed);
+        widthSpring.Step(dt * speed, widthStiffness, widthDamping);
         if (widthSpring.value < 0.0f) {
             widthSpring.value = 0.0f;
             widthSpring.velocity = 0.0f;
         }
 
-        heightSpring.Step(dt, heightStiffness * speed, heightDamping * speed);
+        heightSpring.Step(dt * speed, heightStiffness, heightDamping);
         if (heightSpring.value < 0.0f) {
             heightSpring.value = 0.0f;
             heightSpring.velocity = 0.0f;
         }
 
-        nudgeSpring.Step(dt, 280.0f * speed, 24.0f * speed);
+        nudgeSpring.Step(dt * speed, 280.0f, 24.0f);
 
         {
             std::lock_guard lock(g_stateMutex);
@@ -4922,6 +5430,7 @@ bool StartThreads() {
 
     g_mediaThread = CreateThread(nullptr, 0, MediaThreadProc, nullptr, 0, nullptr);
     g_audioThread = CreateThread(nullptr, 0, AudioThreadProc, nullptr, 0, nullptr);
+    g_weatherThread = CreateThread(nullptr, 0, WeatherThreadProc, nullptr, 0, nullptr);
 #if DYNAMIC_ISLAND_HAS_USER_NOTIFICATION_LISTENER
     g_notificationThread = CreateThread(nullptr, 0, NotificationThreadProc, nullptr, 0, nullptr);
 #endif
@@ -4934,7 +5443,7 @@ void StopThreads() {
         SetEvent(g_stopEvent);
     }
 
-    HANDLE handles[] = {g_renderThread, g_mediaThread, g_audioThread, g_notificationThread};
+    HANDLE handles[] = {g_renderThread, g_mediaThread, g_audioThread, g_weatherThread, g_notificationThread};
     for (HANDLE handle : handles) {
         if (handle) {
             WaitForSingleObject(handle, 3000);
@@ -4945,6 +5454,7 @@ void StopThreads() {
     g_renderThread = nullptr;
     g_mediaThread = nullptr;
     g_audioThread = nullptr;
+    g_weatherThread = nullptr;
     g_notificationThread = nullptr;
 
     if (g_stopEvent) {
