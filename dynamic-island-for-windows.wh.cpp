@@ -31,6 +31,8 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
 | **Weather** | Real-time weather stats powered by wttr.in, including wind speed, humidity, and "feels like" temperature. | ![Weather](https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/weather.png) |
 | **Game Overlay** | Real-time FPS, CPU, GPU, and RAM utilization overlays tailored for gamers. | ![Gamebar](https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/gamebar.png) |
 | **Idle View** | A minimal dashboard with your battery status, digital clock, and sleek pagination dots. | ![Idle](https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/idle.png) |
+| **Camera Privacy** | Shows a green dot when an app is actively using your webcam. | ![Camera](https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/camera-detected.png) |
+| **Mic Privacy** | Shows an orange dot when an app is actively using your microphone. | ![Mic](https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/mic-detected.png) |
 
 ---
 
@@ -2044,105 +2046,79 @@ void UpdateSystemSnapshot() {
 }
 
 // ---- Privacy indicator helpers ----
-// Microphone: check if any app has an active capture audio session.
-bool IsMicrophoneActive() {
-    bool active = false;
-    ComPtr<IMMDeviceEnumerator> enumerator;
-    if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
-                                   CLSCTX_ALL, IID_PPV_ARGS(&enumerator)))) {
-        ComPtr<IMMDevice> capDevice;
-        if (SUCCEEDED(enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &capDevice))) {
-            ComPtr<IAudioSessionManager2> mgr;
-            if (SUCCEEDED(capDevice->Activate(__uuidof(IAudioSessionManager2),
-                                              CLSCTX_ALL, nullptr,
-                                              reinterpret_cast<void**>(mgr.GetAddressOf())))) {
-                ComPtr<IAudioSessionEnumerator> sessEnum;
-                if (SUCCEEDED(mgr->GetSessionEnumerator(&sessEnum))) {
-                    int count = 0;
-                    sessEnum->GetCount(&count);
-                    for (int i = 0; i < count && !active; i++) {
-                        ComPtr<IAudioSessionControl> sess;
-                        if (SUCCEEDED(sessEnum->GetSession(i, &sess))) {
-                            AudioSessionState st;
-                            if (SUCCEEDED(sess->GetState(&st)) && st == AudioSessionStateActive) {
-                                active = true;
+bool IsDeviceActiveViaRegistry(const wchar_t* capability) {
+    bool isActive = false;
+    std::wstring basePath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\";
+    basePath += capability;
+
+    auto CheckSubkeys = [](HKEY hKeyParent) -> bool {
+        DWORD index = 0;
+        wchar_t subKeyName[256];
+        DWORD nameLen = ARRAYSIZE(subKeyName);
+        while (RegEnumKeyExW(hKeyParent, index, subKeyName, &nameLen, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+            HKEY hSub;
+            if (RegOpenKeyExW(hKeyParent, subKeyName, 0, KEY_READ, &hSub) == ERROR_SUCCESS) {
+                if (_wcsicmp(subKeyName, L"NonPackaged") == 0) {
+                    DWORD npIndex = 0;
+                    wchar_t npSubKeyName[256];
+                    DWORD npNameLen = ARRAYSIZE(npSubKeyName);
+                    while (RegEnumKeyExW(hSub, npIndex, npSubKeyName, &npNameLen, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+                        HKEY hNpSub;
+                        if (RegOpenKeyExW(hSub, npSubKeyName, 0, KEY_READ, &hNpSub) == ERROR_SUCCESS) {
+                            uint64_t stopTime = 1;
+                            DWORD dataSize = sizeof(stopTime);
+                            if (RegQueryValueExW(hNpSub, L"LastUsedTimeStop", nullptr, nullptr, reinterpret_cast<LPBYTE>(&stopTime), &dataSize) == ERROR_SUCCESS) {
+                                if (stopTime == 0) {
+                                    RegCloseKey(hNpSub);
+                                    RegCloseKey(hSub);
+                                    return true;
+                                }
                             }
+                            RegCloseKey(hNpSub);
+                        }
+                        npIndex++;
+                        npNameLen = ARRAYSIZE(npSubKeyName);
+                    }
+                } else {
+                    uint64_t stopTime = 1;
+                    DWORD dataSize = sizeof(stopTime);
+                    if (RegQueryValueExW(hSub, L"LastUsedTimeStop", nullptr, nullptr, reinterpret_cast<LPBYTE>(&stopTime), &dataSize) == ERROR_SUCCESS) {
+                        if (stopTime == 0) {
+                            RegCloseKey(hSub);
+                            return true;
                         }
                     }
                 }
+                RegCloseKey(hSub);
             }
+            index++;
+            nameLen = ARRAYSIZE(subKeyName);
+        }
+        return false;
+    };
+
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, basePath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        isActive = CheckSubkeys(hKey);
+        RegCloseKey(hKey);
+    }
+    
+    if (!isActive) {
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, basePath.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            isActive = CheckSubkeys(hKey);
+            RegCloseKey(hKey);
         }
     }
-    return active;
+    
+    return isActive;
 }
 
-// Camera: try to open camera device exclusively; if SHARING_VIOLATION → another process has it.
+bool IsMicrophoneActive() {
+    return IsDeviceActiveViaRegistry(L"microphone");
+}
+
 bool IsCameraActive() {
-    // KSCATEGORY_VIDEO_CAMERA
-    static const GUID kVideoCam =
-        {0xE5323777,0xF976,0x4f5b,{0x9B,0x55,0xB9,0x46,0x99,0xC4,0x6E,0x44}};
-
-    using SetupDiGetClassDevs_t =
-        HDEVINFO(WINAPI*)(const GUID*, PCWSTR, HWND, DWORD);
-    using SetupDiEnumDeviceInterfaces_t =
-        BOOL(WINAPI*)(HDEVINFO, PSP_DEVINFO_DATA, const GUID*, DWORD,
-                      PSP_DEVICE_INTERFACE_DATA);
-    using SetupDiGetDeviceInterfaceDetail_t =
-        BOOL(WINAPI*)(HDEVINFO, PSP_DEVICE_INTERFACE_DATA,
-                      PSP_DEVICE_INTERFACE_DETAIL_DATA, DWORD, PDWORD,
-                      PSP_DEVINFO_DATA);
-    using SetupDiDestroyDeviceInfoList_t = BOOL(WINAPI*)(HDEVINFO);
-
-    static HMODULE setupapi = nullptr;
-    static SetupDiGetClassDevs_t pGetClassDevs = nullptr;
-    static SetupDiEnumDeviceInterfaces_t pEnumInterfaces = nullptr;
-    static SetupDiGetDeviceInterfaceDetail_t pGetInterfaceDetail = nullptr;
-    static SetupDiDestroyDeviceInfoList_t pDestroyList = nullptr;
-    static bool init = false;
-
-    if (!init) {
-        setupapi = LoadLibraryW(L"setupapi.dll");
-        if (setupapi) {
-            pGetClassDevs = (SetupDiGetClassDevs_t)GetProcAddress(setupapi, "SetupDiGetClassDevsW");
-            pEnumInterfaces = (SetupDiEnumDeviceInterfaces_t)GetProcAddress(setupapi, "SetupDiEnumDeviceInterfaces");
-            pGetInterfaceDetail = (SetupDiGetDeviceInterfaceDetail_t)GetProcAddress(setupapi, "SetupDiGetDeviceInterfaceDetailW");
-            pDestroyList = (SetupDiDestroyDeviceInfoList_t)GetProcAddress(setupapi, "SetupDiDestroyDeviceInfoList");
-        }
-        init = true;
-    }
-
-    bool active = false;
-    if (pGetClassDevs && pEnumInterfaces && pGetInterfaceDetail && pDestroyList) {
-        HDEVINFO devInfo = pGetClassDevs(&kVideoCam, nullptr, nullptr,
-                                         DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
-        if (devInfo != INVALID_HANDLE_VALUE) {
-            SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
-            for (DWORD i = 0;
-                 pEnumInterfaces(devInfo, nullptr, &kVideoCam, i, &iface) && !active;
-                 i++) {
-                DWORD needed = 0;
-                pGetInterfaceDetail(devInfo, &iface, nullptr, 0, &needed, nullptr);
-                if (needed > 0) {
-                    std::vector<BYTE> buf(needed);
-                    auto* detail = reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA_W*>(buf.data());
-                    detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
-                    if (pGetInterfaceDetail(devInfo, &iface, detail, needed, nullptr, nullptr)) {
-                        // Try exclusive open — sharing violation = camera is in use.
-                        HANDLE h = CreateFileW(detail->DevicePath, GENERIC_READ,
-                                               0, nullptr, OPEN_EXISTING, 0, nullptr);
-                        if (h == INVALID_HANDLE_VALUE &&
-                            GetLastError() == ERROR_SHARING_VIOLATION) {
-                            active = true;
-                        } else if (h != INVALID_HANDLE_VALUE) {
-                            CloseHandle(h);
-                        }
-                    }
-                }
-            }
-            pDestroyList(devInfo);
-        }
-    }
-    return active;
+    return IsDeviceActiveViaRegistry(L"webcam");
 }
 
 void UpdateProgressSnapshot() {
