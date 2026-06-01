@@ -89,8 +89,12 @@ A fluid, living overlay inspired by Apple's Dynamic Island, bringing a beautiful
 - GameOverlay: false
   $name: Enable game overlay mode
   $description: Shows FPS, CPU, RAM, GPU placeholder, disk, and foreground app.
+- ShowMetricText: false
+  $name: Show labels in metric chips
+  $description: Shows text labels and percentages inside the metric chips (FPS, CPU, RAM, etc).
 - AlwaysShowClock: true
-  $name: Always show clock
+  $name: Always show dynamic island
+  $description: "Shows the idle island (clock/system metrics) when no media is playing."
 - AlwaysOnTop: true
   $name: Always on top
   $description: "Keep the island above all other windows. Disable if it blocks other software."
@@ -221,6 +225,7 @@ struct Settings {
     float blurOpacity = 0.72f;
     float pillOpacity = 0.96f;
     bool gameOverlay = false;
+    bool showMetricText = true;
     bool alwaysShowClock = true;
     bool alwaysOnTop = true;
     bool autoDpiScale = true;
@@ -252,6 +257,9 @@ struct MediaSnapshot {
     uint64_t artGeneration = 0;
     uint64_t sourceIconGeneration = 0;
     double artChangedAt = 0.0;
+    int64_t positionTicks = 0;
+    int64_t endTicks = 0;
+    int64_t lastUpdatedTicks = 0;
 };
 
 struct ClipboardSnapshot {
@@ -544,6 +552,7 @@ void LoadSettings() {
     next.pillOpacity = Clamp((localOpacity >= 0 ? localOpacity : settingOpacity) / 100.0f,
                              0.35f, 1.0f);
     next.gameOverlay = Wh_GetIntSetting(L"GameOverlay") != 0;
+    next.showMetricText = Wh_GetIntSetting(L"ShowMetricText") != 0;
     next.alwaysShowClock = Wh_GetIntSetting(L"AlwaysShowClock") != 0;
     next.alwaysOnTop = Wh_GetIntSetting(L"AlwaysOnTop") != 0;
     next.autoDpiScale = Wh_GetIntSetting(L"AutoDpiScale") != 0;
@@ -1141,9 +1150,8 @@ std::wstring FindBrowserMediaSiteBadge(const std::wstring& sourceAppUserModelId)
 BitmapPixels FindMediaSourceIcon(const std::wstring& sourceAppUserModelId) {
     BitmapPixels pixels;
     if (IsBrowserMediaSource(sourceAppUserModelId)) {
-        // Windows media sessions don't expose browser tab favicons. Avoid
-        // showing the generic browser app icon as if it were the site icon.
-        return pixels;
+        // Continue searching for the browser window anyway to retrieve
+        // the browser's app icon or the PWA's app icon.
     }
 
     const std::wstring sourceLower = ToLowerCopy(sourceAppUserModelId);
@@ -1216,19 +1224,66 @@ DWORD WINAPI MediaThreadProc(void*) {
                 if (session) {
                     auto properties = session.TryGetMediaPropertiesAsync().get();
                     auto playback = session.GetPlaybackInfo();
+                    auto timeline = session.GetTimelineProperties();
 
                     next.available = true;
                     next.playing = playback.PlaybackStatus() == PlaybackStatus::Playing;
                     next.title = properties.Title().c_str();
                     next.artist = properties.Artist().c_str();
+                    
+                    if (timeline) {
+                        int64_t np = timeline.Position().count();
+                        int64_t ne = timeline.EndTime().count();
+                        bool npP = (playback.PlaybackStatus() == PlaybackStatus::Playing);
+                        
+                        std::lock_guard lock(g_stateMutex);
+                        if (np != g_state.media.positionTicks ||
+                            ne != g_state.media.endTicks ||
+                            npP != g_state.media.playing) {
+                            next.positionTicks = np;
+                            next.endTicks = ne;
+                            next.lastUpdatedTicks = GetTickCount64();
+                        } else {
+                            next.positionTicks = g_state.media.positionTicks;
+                            next.endTicks = g_state.media.endTicks;
+                            next.lastUpdatedTicks = g_state.media.lastUpdatedTicks;
+                        }
+                    }
+
                     next.sourceAppUserModelId = session.SourceAppUserModelId().c_str();
                     next.sourceName = FriendlyMediaSourceName(next.sourceAppUserModelId);
-                    next.sourceBadge = MediaSourceBadge(next.sourceName);
-                    if (IsBrowserMediaSource(next.sourceAppUserModelId)) {
-                        next.sourceBadge = FindBrowserMediaSiteBadge(next.sourceAppUserModelId);
+                    
+                    std::wstring prevSourceAppUserModelId;
+                    bool hasPrevIcon = false;
+                    BitmapPixels prevIcon;
+                    uint64_t prevIconGeneration = 0;
+                    std::wstring prevBadge;
+                    {
+                        std::lock_guard lock(g_stateMutex);
+                        prevSourceAppUserModelId = g_state.media.sourceAppUserModelId;
+                        hasPrevIcon = !g_state.media.sourceIcon.bgra.empty();
+                        prevIcon = g_state.media.sourceIcon;
+                        prevIconGeneration = g_state.media.sourceIconGeneration;
+                        prevBadge = g_state.media.sourceBadge;
                     }
-                    next.sourceIcon = FindMediaSourceIcon(next.sourceAppUserModelId);
-                    next.sourceIconGeneration = next.sourceIcon.generation;
+
+                    if (next.sourceAppUserModelId == prevSourceAppUserModelId) {
+                        next.sourceBadge = prevBadge;
+                        next.sourceIcon = prevIcon;
+                        next.sourceIconGeneration = prevIconGeneration;
+                        
+                        if (!hasPrevIcon) {
+                            next.sourceIcon = FindMediaSourceIcon(next.sourceAppUserModelId);
+                            next.sourceIconGeneration = next.sourceIcon.generation;
+                        }
+                    } else {
+                        next.sourceBadge = MediaSourceBadge(next.sourceName);
+                        if (IsBrowserMediaSource(next.sourceAppUserModelId)) {
+                            next.sourceBadge = FindBrowserMediaSiteBadge(next.sourceAppUserModelId);
+                        }
+                        next.sourceIcon = FindMediaSourceIcon(next.sourceAppUserModelId);
+                        next.sourceIconGeneration = next.sourceIcon.generation;
+                    }
 
                     if (auto thumbnail = properties.Thumbnail()) {
                         std::vector<uint8_t> bytes = ReadWinRtStreamBytes(thumbnail);
@@ -1658,29 +1713,28 @@ void UpdateSystemSnapshot() {
         g_prevUserTime = user;
     }
 
-    HRESULT hrCo = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    ComPtr<IMMDeviceEnumerator> enumerator;
-    ComPtr<IMMDevice> device;
-    ComPtr<IAudioEndpointVolume> volume;
-    HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
-                                  CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
-    if (SUCCEEDED(hr)) {
-        hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    static ComPtr<IAudioEndpointVolume> s_volume;
+    if (!s_volume) {
+        ComPtr<IMMDeviceEnumerator> enumerator;
+        ComPtr<IMMDevice> device;
+        HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
+        if (SUCCEEDED(hr)) {
+            hr = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+        }
+        if (SUCCEEDED(hr)) {
+            hr = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr, reinterpret_cast<void**>(s_volume.GetAddressOf()));
+        }
     }
-    if (SUCCEEDED(hr)) {
-        hr = device->Activate(__uuidof(IAudioEndpointVolume), CLSCTX_ALL, nullptr,
-                              reinterpret_cast<void**>(volume.GetAddressOf()));
-    }
-    if (SUCCEEDED(hr)) {
+
+    if (s_volume) {
         float level = 0.0f;
         BOOL muted = FALSE;
-        volume->GetMasterVolumeLevelScalar(&level);
-        volume->GetMute(&muted);
-        next.volumePercent = ClampInt(static_cast<int>(level * 100.0f + 0.5f), 0, 100);
-        next.volumeMuted = muted != FALSE;
-    }
-    if (SUCCEEDED(hrCo)) {
-        CoUninitialize();
+        if (SUCCEEDED(s_volume->GetMasterVolumeLevelScalar(&level)) && SUCCEEDED(s_volume->GetMute(&muted))) {
+            next.volumePercent = ClampInt(static_cast<int>(level * 100.0f + 0.5f), 0, 100);
+            next.volumeMuted = muted != FALSE;
+        } else {
+            s_volume.Reset(); // Retry next time
+        }
     }
 
     std::lock_guard lock(g_stateMutex);
@@ -1704,7 +1758,6 @@ void UpdateSystemSnapshot() {
 // ---- Privacy indicator helpers ----
 // Microphone: check if any app has an active capture audio session.
 bool IsMicrophoneActive() {
-    HRESULT hrCo = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     bool active = false;
     ComPtr<IMMDeviceEnumerator> enumerator;
     if (SUCCEEDED(CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
@@ -1732,7 +1785,6 @@ bool IsMicrophoneActive() {
             }
         }
     }
-    if (SUCCEEDED(hrCo)) CoUninitialize();
     return active;
 }
 
@@ -1753,17 +1805,23 @@ bool IsCameraActive() {
                       PSP_DEVINFO_DATA);
     using SetupDiDestroyDeviceInfoList_t = BOOL(WINAPI*)(HDEVINFO);
 
-    HMODULE setupapi = LoadLibraryW(L"setupapi.dll");
-    if (!setupapi) return false;
+    static HMODULE setupapi = nullptr;
+    static SetupDiGetClassDevs_t pGetClassDevs = nullptr;
+    static SetupDiEnumDeviceInterfaces_t pEnumInterfaces = nullptr;
+    static SetupDiGetDeviceInterfaceDetail_t pGetInterfaceDetail = nullptr;
+    static SetupDiDestroyDeviceInfoList_t pDestroyList = nullptr;
+    static bool init = false;
 
-    auto pGetClassDevs = (SetupDiGetClassDevs_t)
-        GetProcAddress(setupapi, "SetupDiGetClassDevsW");
-    auto pEnumInterfaces = (SetupDiEnumDeviceInterfaces_t)
-        GetProcAddress(setupapi, "SetupDiEnumDeviceInterfaces");
-    auto pGetInterfaceDetail = (SetupDiGetDeviceInterfaceDetail_t)
-        GetProcAddress(setupapi, "SetupDiGetDeviceInterfaceDetailW");
-    auto pDestroyList = (SetupDiDestroyDeviceInfoList_t)
-        GetProcAddress(setupapi, "SetupDiDestroyDeviceInfoList");
+    if (!init) {
+        setupapi = LoadLibraryW(L"setupapi.dll");
+        if (setupapi) {
+            pGetClassDevs = (SetupDiGetClassDevs_t)GetProcAddress(setupapi, "SetupDiGetClassDevsW");
+            pEnumInterfaces = (SetupDiEnumDeviceInterfaces_t)GetProcAddress(setupapi, "SetupDiEnumDeviceInterfaces");
+            pGetInterfaceDetail = (SetupDiGetDeviceInterfaceDetail_t)GetProcAddress(setupapi, "SetupDiGetDeviceInterfaceDetailW");
+            pDestroyList = (SetupDiDestroyDeviceInfoList_t)GetProcAddress(setupapi, "SetupDiDestroyDeviceInfoList");
+        }
+        init = true;
+    }
 
     bool active = false;
     if (pGetClassDevs && pEnumInterfaces && pGetInterfaceDetail && pDestroyList) {
@@ -1796,7 +1854,6 @@ bool IsCameraActive() {
             pDestroyList(devInfo);
         }
     }
-    FreeLibrary(setupapi);
     return active;
 }
 
@@ -2036,7 +2093,6 @@ void HandleStatusClickAtPoint(HWND hwnd, LPARAM lParam) {
 }
 
 void ToggleEndpointMute() {
-    HRESULT hrCo = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     ComPtr<IMMDeviceEnumerator> enumerator;
     ComPtr<IMMDevice> device;
     ComPtr<IAudioEndpointVolume> volume;
@@ -2056,10 +2112,6 @@ void ToggleEndpointMute() {
         volume->SetMute(!muted, nullptr);
         std::lock_guard lock(g_stateMutex);
         g_state.muted = !muted;
-    }
-
-    if (SUCCEEDED(hrCo)) {
-        CoUninitialize();
     }
 }
 
@@ -2525,7 +2577,10 @@ class Renderer {
         const float h = (rect.bottom - rect.top) * scale;
         rect = D2D1::RectF(cx - w * 0.5f, cy - h * 0.5f, cx + w * 0.5f, cy + h * 0.5f);
 
-        const float radius = settings.w11Style ? 8.0f * settings.sizeScale : (rect.bottom - rect.top) * 0.5f;
+        float radius = settings.w11Style ? 8.0f * settings.sizeScale : (rect.bottom - rect.top) * 0.5f;
+        if (activity.kind == IslandKind::Media && !settings.w11Style) {
+            radius = std::min(radius, 44.0f * settings.sizeScale);
+        }
         DrawSoftShadow(rect, radius);
 
         D2D1_ROUNDED_RECT pill = D2D1::RoundedRect(rect, radius, radius);
@@ -2726,12 +2781,12 @@ class Renderer {
 
     void DrawIdleDashboard(const SharedState& state, D2D1_RECT_F rect, const Settings& settings,
                            double now) {
-        if (!settings.alwaysShowClock || !clockFormat_) {
+        if (settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0) {
+            DrawGameOverlay(state, rect, settings.sizeScale);
             return;
         }
 
-        if (settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0) {
-            DrawGameOverlay(state, rect, settings.sizeScale);
+        if (!settings.alwaysShowClock || !clockFormat_) {
             return;
         }
 
@@ -2772,7 +2827,7 @@ class Renderer {
 
             mutedBrush_->SetOpacity(0.72f);
             target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), clockFormat_.Get(), rect,
-                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
             mutedBrush_->SetOpacity(0.58f);
             DrawPageDots(rect, page, 6, scale);
             return;
@@ -2782,7 +2837,7 @@ class Renderer {
                                            rect.left + 104.0f * scale, rect.top + 31.0f * scale);
         textBrush_->SetOpacity(0.94f);
         target_->DrawTextW(buffer, static_cast<UINT32>(wcslen(buffer)), clockFormat_.Get(),
-                           timeRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                           timeRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
         textBrush_->SetOpacity(0.90f);
 
         wchar_t date[64] = {};
@@ -2792,7 +2847,7 @@ class Renderer {
                                            rect.left + 118.0f * scale, rect.bottom - 8.0f * scale);
         mutedBrush_->SetOpacity(0.50f);
         target_->DrawTextW(date, static_cast<UINT32>(wcslen(date)), smallTextFormat_.Get(),
-                           dateRect, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                           dateRect, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
         ComPtr<ID2D1SolidColorBrush> divider;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.075f * settingsOpacity_), &divider);
@@ -2828,20 +2883,25 @@ class Renderer {
 
         ComPtr<ID2D1SolidColorBrush> fpsIconBrush;
         target_->CreateSolidColorBrush(D2D1::ColorF(0.0f, 1.0f, 0.65f, 1.0f), &fpsIconBrush);
-        DrawGameIcon(D2D1::Point2F(fpsPanel.left + 18.0f * scale, fpsPanel.top + 17.0f * scale), 7.0f * scale, 0, fpsIconBrush.Get(), scale);
-        mutedBrush_->SetOpacity(0.44f);
-        target_->DrawTextW(L"FPS", 3, smallTextFormat_.Get(),
-                           D2D1::RectF(fpsPanel.left + 31.0f * scale, fpsPanel.top + 6.0f * scale,
-                                       fpsPanel.right - 10.0f * scale, fpsPanel.top + 24.0f * scale),
-                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        D2D1_POINT_2F fpsCenter = D2D1::Point2F(fpsPanel.left + 18.0f * scale, fpsPanel.top + 17.0f * scale);
+        DrawGameIcon(fpsCenter, 7.0f * scale, 0, fpsIconBrush.Get(), scale);
+
+        if (g_settings.showMetricText) {
+            mutedBrush_->SetOpacity(0.44f);
+            target_->DrawTextW(L"FPS", 3, smallTextFormat_.Get(),
+                               D2D1::RectF(fpsPanel.left + 31.0f * scale, fpsPanel.top + 6.0f * scale,
+                                           fpsPanel.right - 10.0f * scale, fpsPanel.top + 24.0f * scale),
+                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+        }
 
         wchar_t fpsValue[16] = {};
         swprintf_s(fpsValue, L"%d", state.system.renderFps);
         textBrush_->SetOpacity(0.96f);
+        D2D1_RECT_F fpsValueRect = g_settings.showMetricText 
+            ? D2D1::RectF(fpsPanel.left + 16.0f * scale, fpsPanel.top + 23.0f * scale, fpsPanel.right - 10.0f * scale, fpsPanel.bottom - 4.0f * scale)
+            : D2D1::RectF(fpsPanel.left + 31.0f * scale, fpsPanel.top + 10.0f * scale, fpsPanel.right - 10.0f * scale, fpsPanel.bottom - 4.0f * scale);
         target_->DrawTextW(fpsValue, static_cast<UINT32>(wcslen(fpsValue)), textFormat_.Get(),
-                           D2D1::RectF(fpsPanel.left + 16.0f * scale, fpsPanel.top + 24.0f * scale,
-                                       fpsPanel.right - 10.0f * scale, fpsPanel.bottom - 5.0f * scale),
-                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                           fpsValueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
         const float cardTop = rect.top + 10.0f * scale;
         const float cardW = 62.0f * scale;
@@ -2899,11 +2959,13 @@ class Renderer {
 
         DrawGameIcon(D2D1::Point2F(rect.left + 18.0f * scale, rect.top + 18.0f * scale), 8.0f * scale, iconKind, metricBrush.Get(), scale);
 
-        mutedBrush_->SetOpacity(0.56f);
-        target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), smallTextFormat_.Get(),
-                           D2D1::RectF(rect.left + 31.0f * scale, rect.top + 6.0f * scale,
-                                       rect.right - 5.0f * scale, rect.top + 23.0f * scale),
-                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        if (g_settings.showMetricText) {
+            mutedBrush_->SetOpacity(0.56f);
+            target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), smallTextFormat_.Get(),
+                               D2D1::RectF(rect.left + 31.0f * scale, rect.top + 6.0f * scale,
+                                           rect.right - 5.0f * scale, rect.top + 24.0f * scale),
+                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+        }
 
         wchar_t value[16] = {};
         if (percent < 0) {
@@ -2912,10 +2974,11 @@ class Renderer {
             swprintf_s(value, L"%d%%", percent);
         }
         textBrush_->SetOpacity(0.90f);
+        D2D1_RECT_F valueRect = g_settings.showMetricText 
+            ? D2D1::RectF(rect.left + 10.0f * scale, rect.top + 22.0f * scale, rect.right - 8.0f * scale, rect.bottom - 8.0f * scale)
+            : D2D1::RectF(rect.left + 31.0f * scale, rect.top + 10.0f * scale, rect.right - 5.0f * scale, rect.bottom - 8.0f * scale);
         target_->DrawTextW(value, static_cast<UINT32>(wcslen(value)), textFormat_.Get(),
-                           D2D1::RectF(rect.left + 10.0f * scale, rect.top + 23.0f * scale,
-                                       rect.right - 8.0f * scale, rect.bottom - 9.0f * scale),
-                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                           valueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
         const float pct = percent < 0 ? 0.0f : Clamp(percent / 100.0f, 0.0f, 1.0f);
         D2D1_RECT_F track = D2D1::RectF(rect.left + 10.0f * scale, rect.bottom - 6.0f * scale,
@@ -3242,10 +3305,12 @@ class Renderer {
             }
         }
 
-        D2D1_RECT_F labelRect = D2D1::RectF(rect.left + 23.0f * scale, rect.top + 5.0f * scale, rect.right - 6.0f * scale, rect.top + 18.0f * scale);
-        mutedBrush_->SetOpacity(0.48f);
-        target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), smallTextFormat_.Get(), labelRect,
-                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+        if (g_settings.showMetricText) {
+            D2D1_RECT_F labelRect = D2D1::RectF(rect.left + 23.0f * scale, rect.top + 3.0f * scale, rect.right - 2.0f * scale, rect.top + 20.0f * scale);
+            mutedBrush_->SetOpacity(0.48f);
+            target_->DrawTextW(label, static_cast<UINT32>(wcslen(label)), smallTextFormat_.Get(), labelRect,
+                               mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+        }
 
         wchar_t value[16] = {};
         if (percent < 0) {
@@ -3254,9 +3319,11 @@ class Renderer {
             swprintf_s(value, L"%d%%", percent);
         }
         textBrush_->SetOpacity(0.90f);
-        D2D1_RECT_F valueRect = D2D1::RectF(rect.left + 7.5f * scale, rect.top + 15.5f * scale, rect.right - 6.0f * scale, rect.bottom - 11.0f * scale);
+        D2D1_RECT_F valueRect = g_settings.showMetricText
+            ? D2D1::RectF(rect.left + 7.5f * scale, rect.top + 14.5f * scale, rect.right - 2.0f * scale, rect.bottom - 8.0f * scale)
+            : D2D1::RectF(rect.left + 23.0f * scale, rect.top + 8.0f * scale, rect.right - 2.0f * scale, rect.bottom - 8.0f * scale);
         target_->DrawTextW(value, static_cast<UINT32>(wcslen(value)), textFormat_.Get(),
-                           valueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                           valueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
         const float clamped = percent < 0 ? 0.0f : Clamp(percent / 100.0f, 0.0f, 1.0f);
         D2D1_RECT_F meterTrack = D2D1::RectF(rect.left + 8.0f * scale, rect.bottom - 6.0f * scale, rect.right - 8.0f * scale, rect.bottom - 4.0f * scale);
@@ -3292,43 +3359,145 @@ class Renderer {
     }
 
     void DrawMedia(const SharedState& state, D2D1_RECT_F rect, double now) {
-        // Apple DI media: large square art on left, text center.
-        const float artSize = rect.bottom - rect.top - 10.0f;
-        D2D1_RECT_F artRect = D2D1::RectF(rect.left + 7, rect.top + 5,
-                                          rect.left + 7 + artSize, rect.bottom - 5);
-        DrawAlbumArt(state.media, artRect, now);
+        const float height = rect.bottom - rect.top;
 
-        const float textLeft = artRect.right + 12;
-        const float textRight = rect.right - 14;
-        const float cy = (rect.top + rect.bottom) * 0.5f;
+        float radius = g_settings.w11Style ? 8.0f * g_settings.sizeScale : height * 0.5f;
+        if (!g_settings.w11Style) radius = std::min(radius, 44.0f * g_settings.sizeScale);
+        ComPtr<ID2D1RoundedRectangleGeometry> mask;
+        d2dFactory_->CreateRoundedRectangleGeometry(D2D1::RoundedRect(rect, radius, radius), &mask);
+        ComPtr<ID2D1Layer> layer;
+        target_->CreateLayer(&layer);
 
-        // Source name (app) — dim label above title.
-        D2D1_RECT_F sourceRect = D2D1::RectF(textLeft, cy - 24, textRight, cy - 10);
-        mutedBrush_->SetOpacity(0.38f);
-        const std::wstring& src = state.media.sourceName;
-        target_->DrawTextW(src.empty() ? L"Now Playing" : src.c_str(),
-                           static_cast<UINT32>(src.empty() ? 11 : src.size()),
-                           smallTextFormat_.Get(), sourceRect, mutedBrush_.Get(),
-                           D2D1_DRAW_TEXT_OPTIONS_CLIP);
-        mutedBrush_->SetOpacity(0.50f);
+        float expandedAlpha = std::clamp((height - 60.0f) / 60.0f, 0.0f, 1.0f);
+        float collapsedAlpha = std::clamp((80.0f - height) / 30.0f, 0.0f, 1.0f);
 
-        // Title — bold, prominent.
-        D2D1_RECT_F titleRect = D2D1::RectF(textLeft, cy - 9, textRight, cy + 8);
-        DrawMarqueeText(state.media.title.empty() ? L"Unknown" : state.media.title,
-                        titleRect, textFormat_.Get(), textBrush_.Get(), now, 42.0f);
+        // Expanded UI
+        if (expandedAlpha > 0.01f && mask && layer) {
+            target_->PushLayer(D2D1::LayerParameters(rect, mask.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), expandedAlpha, nullptr, D2D1_LAYER_OPTIONS_NONE), layer.Get());
+            
+            // Expanded Apple DI media: large square art on left, text center.
+            const float artSize = 64.0f;
+            D2D1_RECT_F artRect = D2D1::RectF(rect.left + 24.0f, rect.top + 20.0f,
+                                              rect.left + 24.0f + artSize, rect.top + 20.0f + artSize);
+            DrawAlbumArt(state.media, artRect, now, 16.0f, true);
 
-        // Artist — muted below title.
-        D2D1_RECT_F artistRect = D2D1::RectF(textLeft, cy + 10, textRight, cy + 25);
-        mutedBrush_->SetOpacity(0.55f);
-        DrawMarqueeText(state.media.artist.empty() ? L"" : state.media.artist,
-                        artistRect, smallTextFormat_.Get(), mutedBrush_.Get(), now, 30.0f);
-        mutedBrush_->SetOpacity(0.50f);
+            const float waveW = 32.0f;
+            const float waveH = 20.0f;
+            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - waveW,
+                                               rect.top + 20.0f + (artSize - waveH) * 0.5f,
+                                               rect.right - 24.0f,
+                                               rect.top + 20.0f + (artSize + waveH) * 0.5f);
+
+            const float textLeft = artRect.right + 18.0f;
+            const float textRight = waveRect.left - 16.0f;
+            
+            // Title — bold, prominent.
+            D2D1_RECT_F titleRect = D2D1::RectF(textLeft, rect.top + 34.0f, textRight, rect.top + 54.0f);
+            DrawMarqueeText(state.media.title.empty() ? L"Unknown" : state.media.title,
+                            titleRect, textFormat_.Get(), textBrush_.Get(), now, 42.0f);
+
+            // Artist — muted below title.
+            D2D1_RECT_F artistRect = D2D1::RectF(textLeft, rect.top + 54.0f, textRight, rect.top + 74.0f);
+            mutedBrush_->SetOpacity(0.55f);
+            DrawMarqueeText(state.media.artist.empty() ? L"" : state.media.artist,
+                            artistRect, smallTextFormat_.Get(), mutedBrush_.Get(), now, 30.0f);
+            mutedBrush_->SetOpacity(0.50f);
+
+            if (state.media.playing) {
+                DrawWaveform(state, waveRect);
+            } else {
+                mutedBrush_->SetOpacity(0.5f);
+                for (int i = 0; i < 4; ++i) {
+                    target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 4.0f + 2.0f, (waveRect.top + waveRect.bottom) * 0.5f), 1.2f, 1.2f), mutedBrush_.Get());
+                }
+            }
+
+            // Timeline (Scrubber)
+            const float scrubberY = rect.top + 114.0f;
+            double currentPosition = state.media.positionTicks / 10000000.0;
+            double duration = state.media.endTicks / 10000000.0;
+            if (state.media.playing && state.media.lastUpdatedTicks > 0) {
+                currentPosition += (GetTickCount64() - state.media.lastUpdatedTicks) / 1000.0;
+            }
+            currentPosition = std::max(0.0, std::min(currentPosition, duration));
+
+            auto FormatTime = [](double seconds) -> std::wstring {
+                if (seconds <= 0.0 || _isnan(seconds)) return L"0:00";
+                int m = static_cast<int>(seconds) / 60;
+                int s = static_cast<int>(seconds) % 60;
+                wchar_t buf[16];
+                swprintf_s(buf, L"%d:%02d", m, s);
+                return buf;
+            };
+
+            std::wstring elapsedStr = FormatTime(currentPosition);
+            std::wstring remainStr = L"-" + FormatTime(duration - currentPosition);
+
+            const float scrubLeft = rect.left + 24.0f;
+            const float scrubRight = rect.right - 24.0f;
+            
+            mutedBrush_->SetOpacity(0.8f);
+            D2D1_RECT_F elRect = D2D1::RectF(scrubLeft, scrubberY - 8.0f, scrubLeft + 40.0f, scrubberY + 8.0f);
+            target_->DrawTextW(elapsedStr.c_str(), static_cast<UINT32>(elapsedStr.size()), smallTextFormat_.Get(), elRect, mutedBrush_.Get());
+            
+            D2D1_RECT_F remRect = D2D1::RectF(scrubRight - 36.0f, scrubberY - 8.0f, scrubRight, scrubberY + 8.0f);
+            target_->DrawTextW(remainStr.c_str(), static_cast<UINT32>(remainStr.size()), smallTextFormat_.Get(), remRect, mutedBrush_.Get());
+
+            const float barLeft = scrubLeft + 36.0f;
+            const float barRight = scrubRight - 38.0f;
+            const float progress = duration > 0.0 ? static_cast<float>(currentPosition / duration) : 0.0f;
+
+            ComPtr<ID2D1SolidColorBrush> scrubBg;
+            target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.15f), &scrubBg);
+            target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barRight, scrubberY + 2.5f), 2.5f, 2.5f), scrubBg.Get());
+
+            ComPtr<ID2D1SolidColorBrush> scrubFg;
+            target_->CreateSolidColorBrush(state.media.art.bgra.empty() ? D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.9f) : state.media.art.sampledAccent, &scrubFg);
+            const float scrubW = (barRight - barLeft) * progress;
+            target_->FillRoundedRectangle(D2D1::RoundedRect(D2D1::RectF(barLeft, scrubberY - 2.5f, barLeft + scrubW, scrubberY + 2.5f), 2.5f, 2.5f), scrubFg.Get());
+
+            // Controls
+            const float cy = rect.top + 148.0f;
+            const float cx = (rect.left + rect.right) * 0.5f;
+            DrawMediaControls(state.media.playing, 
+                              D2D1::Point2F(cx - 64.0f, cy),
+                              D2D1::Point2F(cx, cy),
+                              D2D1::Point2F(cx + 64.0f, cy));
+
+            target_->PopLayer();
+        }
+
+        // Collapsed UI
+        if (collapsedAlpha > 0.01f && mask && layer) {
+            target_->PushLayer(D2D1::LayerParameters(rect, mask.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1::IdentityMatrix(), collapsedAlpha, nullptr, D2D1_LAYER_OPTIONS_NONE), layer.Get());
+            
+            const float cy = (rect.top + rect.bottom) * 0.5f;
+            const float artPadding = 4.0f;
+            const float artSize = 36.0f - artPadding * 2.0f; // Fixed size based on default 36.0f height
+            
+            D2D1_RECT_F artRect = D2D1::RectF(rect.left + 6.0f, cy - artSize * 0.5f,
+                                              rect.left + 6.0f + artSize, cy + artSize * 0.5f);
+            DrawAlbumArt(state.media, artRect, now, artSize * 0.5f, false);
+
+            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 34.0f, cy - 8.0f,
+                                               rect.right - 10.0f, cy + 8.0f);
+            if (state.media.playing) {
+                DrawWaveform(state, waveRect);
+            } else {
+                mutedBrush_->SetOpacity(0.5f);
+                for (int i = 0; i < 4; ++i) {
+                    target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 6.0f + 3.0f, cy), 1.5f, 1.5f), mutedBrush_.Get());
+                }
+            }
+
+            target_->PopLayer();
+        }
     }
 
     void DrawMediaControls(bool playing, D2D1_POINT_2F prev, D2D1_POINT_2F play, D2D1_POINT_2F next) {
-        DrawMediaButton(prev, 10.0f, 0, false);
-        DrawMediaButton(play, 13.0f, playing ? 1 : 2, true);
-        DrawMediaButton(next, 10.0f, 3, false);
+        DrawMediaButton(prev, 16.0f, 0, false);
+        DrawMediaButton(play, 22.0f, playing ? 1 : 2, true);
+        DrawMediaButton(next, 16.0f, 3, false);
     }
 
     void DrawMediaButton(D2D1_POINT_2F center, float radius, int kind, bool primary) {
@@ -3377,8 +3546,7 @@ class Renderer {
         accentBrush_->SetOpacity(1.0f);
     }
 
-    void DrawAlbumArt(const MediaSnapshot& media, D2D1_RECT_F rect, double now) {
-        const float radius = 9.0f;
+    void DrawAlbumArt(const MediaSnapshot& media, D2D1_RECT_F rect, double now, float radius = 9.0f, bool drawBadge = true) {
         ComPtr<ID2D1RoundedRectangleGeometry> mask;
         HRESULT hrMask = d2dFactory_->CreateRoundedRectangleGeometry(
             D2D1::RoundedRect(rect, radius, radius), &mask);
@@ -3420,29 +3588,14 @@ class Renderer {
             }
         }
 
-        if (!media.sourceIcon.bgra.empty() || !media.sourceBadge.empty()) {
+        if (drawBadge && !media.sourceIcon.bgra.empty()) {
             D2D1_RECT_F badge = D2D1::RectF(rect.right - 24, rect.bottom - 22,
                                            rect.right - 3, rect.bottom - 3);
-            if (!media.sourceIcon.bgra.empty()) {
-                DrawCircularBitmapPixels(media.sourceIcon,
-                                         D2D1::Point2F((badge.left + badge.right) * 0.5f,
-                                                       (badge.top + badge.bottom) * 0.5f),
-                                         9.5f, mediaSourceIconBitmap_,
-                                         mediaSourceIconGeneration_, 0.98f);
-            } else {
-                ComPtr<ID2D1SolidColorBrush> siteBg;
-                target_->CreateSolidColorBrush(D2D1::ColorF(0.02f, 0.025f, 0.030f, 0.88f), &siteBg);
-                target_->FillRoundedRectangle(D2D1::RoundedRect(badge, 7, 7), siteBg.Get());
-                accentBrush_->SetOpacity(0.55f);
-                target_->DrawRoundedRectangle(D2D1::RoundedRect(badge, 7, 7), accentBrush_.Get(), 1.0f);
-                accentBrush_->SetOpacity(1.0f);
-                D2D1_RECT_F badgeText = D2D1::RectF(badge.left + 2, badge.top + 2,
-                                                    badge.right - 2, badge.bottom - 2);
-                target_->DrawTextW(media.sourceBadge.c_str(),
-                                   static_cast<UINT32>(media.sourceBadge.size()),
-                                   smallTextFormat_.Get(), badgeText, textBrush_.Get(),
-                                   D2D1_DRAW_TEXT_OPTIONS_CLIP);
-            }
+            DrawCircularBitmapPixels(media.sourceIcon,
+                                     D2D1::Point2F((badge.left + badge.right) * 0.5f,
+                                                   (badge.top + badge.bottom) * 0.5f),
+                                     9.5f, mediaSourceIconBitmap_,
+                                     mediaSourceIconGeneration_, 0.98f);
         }
 
         if (roundedClip) {
@@ -3549,30 +3702,45 @@ class Renderer {
         }
 
         const float available = rect.right - rect.left;
-        target_->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        
+        // We only want to clip horizontally so we don't bleed out of the pill.
+        // We expand the vertical bounds so descenders/ascenders aren't cut off.
+        D2D1_RECT_F clipRect = rect;
+        clipRect.top -= 10.0f;
+        clipRect.bottom += 10.0f;
+        target_->PushAxisAlignedClip(clipRect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+
         if (metrics.widthIncludingTrailingWhitespace <= available) {
             target_->DrawTextLayout(D2D1::Point2F(rect.left, rect.top), layout.Get(), brush,
-                                    D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                                    D2D1_DRAW_TEXT_OPTIONS_NONE);
         } else {
             const float cycle = metrics.widthIncludingTrailingWhitespace + 38.0f;
             const float offset = std::fmod(static_cast<float>(now) * speed, cycle);
             target_->DrawTextLayout(D2D1::Point2F(rect.left - offset, rect.top), layout.Get(),
-                                    brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                                    brush, D2D1_DRAW_TEXT_OPTIONS_NONE);
             target_->DrawTextLayout(D2D1::Point2F(rect.left - offset + cycle, rect.top),
-                                    layout.Get(), brush, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+                                    layout.Get(), brush, D2D1_DRAW_TEXT_OPTIONS_NONE);
         }
         target_->PopAxisAlignedClip();
     }
 
     void DrawWaveform(const SharedState& state, D2D1_RECT_F rect) {
-        const size_t count = 18;
-        const float gap = 3.0f;
-        const float barWidth = ((rect.right - rect.left) - gap * (count - 1)) / count;
+        const float gap = 2.5f;
+        const float minBarWidth = 2.0f;
+        const float availableW = rect.right - rect.left;
+        size_t count = std::max<size_t>(1, static_cast<size_t>((availableW + gap) / (minBarWidth + gap)));
+        count = std::min<size_t>(count, 32);
+
+        const float barWidth = (availableW - gap * (count - 1)) / count;
         const float centerY = (rect.top + rect.bottom) * 0.5f;
         const float maxH = (rect.bottom - rect.top) * 0.86f;
 
+        // Use a step size of 4 samples (approx 40ms) so bars aren't identical
+        const size_t step = 4;
+
         for (size_t i = 0; i < count; ++i) {
-            const size_t source = (state.waveformWrite + state.waveform.size() - count + i) %
+            const size_t offset = (count - i) * step;
+            const size_t source = (state.waveformWrite + state.waveform.size() - offset) %
                                   state.waveform.size();
             const float amp = Clamp(state.waveform[source], 0.03f, 1.0f);
             const float h = std::max(3.0f, amp * maxH);
@@ -4085,8 +4253,8 @@ Activity ActivityForKind(IslandKind kind, const Settings& settings) {
 
     switch (kind) {
         case IslandKind::Media:
-            activity.width = 320.0f;
-            activity.height = 58.0f;
+            activity.width = 110.0f;
+            activity.height = 36.0f;
             break;
         case IslandKind::Progress:
             activity.width = 230.0f;
@@ -4259,11 +4427,64 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
         case WM_LBUTTONUP:
             {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
                 bool mediaActive = false;
                 {
                     std::lock_guard lock(g_stateMutex);
-                    mediaActive = g_settings.media && g_state.media.available && g_state.media.playing;
+                    mediaActive = g_settings.media && g_state.media.available;
                 }
+
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                const float height = static_cast<float>(clientRect.bottom - clientRect.top);
+                const float width = static_cast<float>(clientRect.right - clientRect.left);
+
+                if (mediaActive && height > 60.0f) {
+                    const float cy = 136.0f;
+                    if (yPos > cy - 30.0f && yPos < cy + 30.0f) {
+                        // Check button clicks in expanded media view
+                        const float cx = width * 0.5f;
+                        int cmd = -1;
+                        if (xPos > cx - 84.0f && xPos < cx - 44.0f) cmd = 0; // Prev
+                        else if (xPos > cx - 24.0f && xPos < cx + 24.0f) cmd = 1; // Play/Pause
+                        else if (xPos > cx + 44.0f && xPos < cx + 84.0f) cmd = 2; // Next
+
+                        if (cmd != -1) {
+                            std::thread([cmd]() {
+                                winrt::init_apartment(winrt::apartment_type::multi_threaded);
+                                try {
+                                    using Manager = winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+                                    auto manager = Manager::RequestAsync().get();
+                                    if (manager) {
+                                        auto sessions = manager.GetSessions();
+                                        std::wstring currentAumid;
+                                        {
+                                            std::lock_guard lock(g_stateMutex);
+                                            currentAumid = g_state.media.sourceAppUserModelId;
+                                        }
+                                        winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession session = nullptr;
+                                        for (auto const& s : sessions) {
+                                            if (s.SourceAppUserModelId().c_str() == currentAumid) {
+                                                session = s;
+                                                break;
+                                            }
+                                        }
+                                        if (!session) session = manager.GetCurrentSession();
+
+                                        if (session) {
+                                            if (cmd == 0) session.TrySkipPreviousAsync().get();
+                                            else if (cmd == 1) session.TryTogglePlayPauseAsync().get();
+                                            else if (cmd == 2) session.TrySkipNextAsync().get();
+                                        }
+                                    }
+                                } catch (...) {}
+                            }).detach();
+                            return 0;
+                        }
+                    }
+                }
+
                 if (mediaActive) {
                     OpenRelevantApp();
                 } else {
@@ -4434,7 +4655,7 @@ DWORD WINAPI RenderThreadProc(void*) {
         GetCursorPos(&cursor);
         const bool hover = PtInRect(&windowRect, cursor) != FALSE;
 
-        if (primary.kind == IslandKind::Idle && (hover || pinned)) {
+        if (primary.kind == IslandKind::Idle && pinned) {
             primary.width = 336.0f * g_settings.sizeScale;
             primary.height = 58.0f * g_settings.sizeScale;
         }
@@ -4442,6 +4663,13 @@ DWORD WINAPI RenderThreadProc(void*) {
             (g_settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0)) {
             primary.width = 372.0f * g_settings.sizeScale;
             primary.height = 64.0f * g_settings.sizeScale;
+        }
+        if (primary.kind == IslandKind::Media) {
+            bool recentArtChange = (NowSeconds() - g_state.media.artChangedAt) < 4.0;
+            if (hover || pinned || recentArtChange) {
+                primary.width = 380.0f * g_settings.sizeScale;
+                primary.height = 184.0f * g_settings.sizeScale;
+            }
         }
 
         float targetWidth = primary.width;
@@ -4505,9 +4733,100 @@ DWORD WINAPI RenderThreadProc(void*) {
 
         SetClickThrough(hwnd, primary.kind == IslandKind::Idle && !hover && !pinned);
 
-        renderer.Render(snapshot, g_settings, primary, secondary,
-                        widthSpring.value, heightSpring.value, nudgeSpring.value,
-                        hover, pinned, now);
+        bool needsRender = false;
+
+        // Check if animating structurally
+        if (std::abs(widthSpring.velocity) > 0.01f || std::abs(widthSpring.target - widthSpring.value) > 0.01f ||
+            std::abs(heightSpring.velocity) > 0.01f || std::abs(heightSpring.target - heightSpring.value) > 0.01f ||
+            std::abs(nudgeSpring.velocity) > 0.01f || std::abs(nudgeSpring.target - nudgeSpring.value) > 0.01f) {
+            needsRender = true;
+        }
+
+        // Check if layout was explicitly invalidated
+        if (g_layoutDirty.load()) {
+            needsRender = true;
+        }
+
+        // Hover or pinned state changes visual elements slightly
+        static bool prevHover = false;
+        static bool prevPinned = false;
+        if (hover != prevHover || pinned != prevPinned) {
+            needsRender = true;
+            prevHover = hover;
+            prevPinned = pinned;
+        }
+
+        // Animated activities that require continuous rendering
+        if (primary.kind == IslandKind::Media || primary.kind == IslandKind::BatteryLow ||
+            primary.kind == IslandKind::Clipboard || primary.kind == IslandKind::Notification) {
+            needsRender = true;
+        }
+
+        // Privacy dots
+        if (snapshot.system.micActive || snapshot.system.cameraActive) {
+            needsRender = true;
+        }
+        
+        // Idle dashboard clock changes once a minute
+        static SYSTEMTIME prevTime = {};
+        if (primary.kind == IslandKind::Idle && g_settings.alwaysShowClock) {
+            SYSTEMTIME local = {};
+            GetLocalTime(&local);
+            if (local.wMinute != prevTime.wMinute) {
+                needsRender = true;
+                prevTime = local;
+            }
+        }
+
+        // Compare data snapshot to detect changes
+        static uint64_t prevArtGen = 0;
+        static uint64_t prevSrcIconGen = 0;
+        static uint64_t prevNotifIconGen = 0;
+        static uint64_t prevClipIconGen = 0;
+        static int prevCpu = -1;
+        static int prevRam = -1;
+        static int prevDisk = -1;
+        static int prevVol = -1;
+        static bool prevMuted = false;
+        static int prevBat = -1;
+        static bool prevCharging = false;
+        static int prevProg = -1;
+        static std::wstring prevMediaTitle;
+        
+        if (snapshot.media.artGeneration != prevArtGen ||
+            snapshot.media.sourceIconGeneration != prevSrcIconGen ||
+            snapshot.media.title != prevMediaTitle ||
+            snapshot.notification.icon.generation != prevNotifIconGen ||
+            snapshot.clipboard.appIcon.generation != prevClipIconGen ||
+            snapshot.system.cpuPercent != prevCpu ||
+            snapshot.system.memoryPercent != prevRam ||
+            snapshot.system.diskFreePercent != prevDisk ||
+            snapshot.system.volumePercent != prevVol ||
+            snapshot.system.volumeMuted != prevMuted ||
+            snapshot.battery.percent != prevBat ||
+            snapshot.battery.charging != prevCharging ||
+            snapshot.progress.percent != prevProg) {
+            needsRender = true;
+            prevArtGen = snapshot.media.artGeneration;
+            prevSrcIconGen = snapshot.media.sourceIconGeneration;
+            prevMediaTitle = snapshot.media.title;
+            prevNotifIconGen = snapshot.notification.icon.generation;
+            prevClipIconGen = snapshot.clipboard.appIcon.generation;
+            prevCpu = snapshot.system.cpuPercent;
+            prevRam = snapshot.system.memoryPercent;
+            prevDisk = snapshot.system.diskFreePercent;
+            prevVol = snapshot.system.volumePercent;
+            prevMuted = snapshot.system.volumeMuted;
+            prevBat = snapshot.battery.percent;
+            prevCharging = snapshot.battery.charging;
+            prevProg = snapshot.progress.percent;
+        }
+
+        if (needsRender) {
+            renderer.Render(snapshot, g_settings, primary, secondary,
+                            widthSpring.value, heightSpring.value, nudgeSpring.value,
+                            hover, pinned, now);
+        }
 
         WaitForSingleObject(g_stopEvent, 16);
     }
