@@ -3333,7 +3333,8 @@ class Renderer {
             DrawGameOverlay(state, rect, 1.0f);
             return;
         }
-        if (!settings.alwaysShowClock || !clockFormat_) return;
+        bool privacyActive = state.system.micActive || state.system.cameraActive;
+        if ((!settings.alwaysShowClock && !privacyActive) || !clockFormat_) return;
 
         SYSTEMTIME local = {};
         GetLocalTime(&local);
@@ -3386,7 +3387,13 @@ class Renderer {
         else DrawWeatherDashboard(state, rect, settings, now, scale, hasWeather, wIcon, wText);
 
         // Pagination dots (Vertical on the right edge)
-        const float dotX = rect.right - 10.0f * scale;
+        float shiftX = 0.0f;
+        if (state.system.micActive && state.system.cameraActive) {
+            shiftX = 30.0f * scale;
+        } else if (state.system.micActive || state.system.cameraActive) {
+            shiftX = 16.0f * scale;
+        }
+        const float dotX = rect.right - 10.0f * scale - shiftX;
         const float dotY = (rect.top + rect.bottom) * 0.5f;
         const float spacing = 8.0f * scale;
         const float r = 2.5f * scale;
@@ -3915,11 +3922,18 @@ class Renderer {
                                                   rect.left + 24.0f + artSize, rect.top + 20.0f + artSize);
                 DrawAlbumArt(state.media, artRect, now, 16.0f, true);
 
+                float shiftX = 0.0f;
+                if (state.system.micActive && state.system.cameraActive) {
+                    shiftX = 30.0f;
+                } else if (state.system.micActive || state.system.cameraActive) {
+                    shiftX = 16.0f;
+                }
+
                 const float waveW = 32.0f;
                 const float waveH = 20.0f;
-                D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - waveW,
+                D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - shiftX - waveW,
                                                    rect.top + 20.0f + (artSize - waveH) * 0.5f,
-                                                   rect.right - 24.0f,
+                                                   rect.right - 24.0f - shiftX,
                                                    rect.top + 20.0f + (artSize + waveH) * 0.5f);
 
                 const float textLeft = artRect.right + 18.0f;
@@ -4012,7 +4026,13 @@ class Renderer {
 
             // Pagination dots (Vertical on the right edge)
             const float scale = 1.0f;
-            const float dotX = rect.right - 10.0f * scale;
+            float shiftX = 0.0f;
+            if (state.system.micActive && state.system.cameraActive) {
+                shiftX = 30.0f * scale;
+            } else if (state.system.micActive || state.system.cameraActive) {
+                shiftX = 16.0f * scale;
+            }
+            const float dotX = rect.right - 10.0f * scale - shiftX;
             const float dotY = (rect.top + rect.bottom) * 0.5f;
             const float spacing = 8.0f * scale;
             const float r = 2.5f * scale;
@@ -4040,8 +4060,15 @@ class Renderer {
                                               rect.left + 8.0f + artSize, cy + artSize * 0.5f);
             DrawAlbumArt(state.media, artRect, now, artSize * 0.5f, false);
 
-            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 42.0f, cy - 10.0f,
-                                               rect.right - 14.0f, cy + 10.0f);
+            float shiftX = 0.0f;
+            if (state.system.micActive && state.system.cameraActive) {
+                shiftX = 30.0f;
+            } else if (state.system.micActive || state.system.cameraActive) {
+                shiftX = 16.0f;
+            }
+
+            D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 42.0f - shiftX, cy - 10.0f,
+                                               rect.right - 14.0f - shiftX, cy + 10.0f);
             if (state.media.playing) {
                 DrawWaveform(state, waveRect);
             } else {
@@ -4834,7 +4861,7 @@ class Renderer {
     D2D1_COLOR_F pillBgColor_ = D2D1::ColorF(0.051f, 0.051f, 0.059f, 1.0f);
 };
 
-Activity ActivityForKind(IslandKind kind, const Settings& settings) {
+Activity ActivityForKind(IslandKind kind, const Settings& settings, const SharedState& state) {
     Activity activity;
     activity.kind = kind;
 
@@ -4873,7 +4900,7 @@ Activity ActivityForKind(IslandKind kind, const Settings& settings) {
             break;
         case IslandKind::Idle:
         default:
-            if (!settings.alwaysShowClock) {
+            if (!settings.alwaysShowClock && !state.system.micActive && !state.system.cameraActive) {
                 activity.width = 0.0f;
                 activity.height = 0.0f;
             } else {
@@ -5256,10 +5283,10 @@ DWORD WINAPI RenderThreadProc(void*) {
         }
 
         const std::vector<IslandKind> kinds = ChooseActivities(snapshot, g_settings, now);
-        Activity primary = ActivityForKind(kinds[0], g_settings);
+        Activity primary = ActivityForKind(kinds[0], g_settings, snapshot);
         std::optional<Activity> secondary;
         if (kinds.size() >= 2) {
-            secondary = ActivityForKind(kinds[1], g_settings);
+            secondary = ActivityForKind(kinds[1], g_settings, snapshot);
         }
 
         const bool pinned = Wh_GetIntValue(L"PinnedExpanded", 0) != 0;
@@ -5277,7 +5304,8 @@ DWORD WINAPI RenderThreadProc(void*) {
         GetCursorPos(&cursor);
         const bool hover = PtInRect(&windowRect, cursor) != FALSE;
 
-        if (primary.kind == IslandKind::Idle && (pinned || (hover && g_settings.alwaysShowClock))) {
+        bool privacyActive = snapshot.system.micActive || snapshot.system.cameraActive;
+        if (primary.kind == IslandKind::Idle && (pinned || (hover && (g_settings.alwaysShowClock || privacyActive)))) {
             primary.width = 380.0f * g_settings.sizeScale;
             primary.height = 184.0f * g_settings.sizeScale;
         }
