@@ -49,7 +49,7 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
 
 - **Hover & Scroll:** Hover over the island to seamlessly expand it. Use your mouse scroll wheel to swipe between the Media, Calendar, and Weather tabs.
 - **Right-Click Menu:** Right-click the island to access Theme presets, Transparency settings, and to pin the island open.
-- **Windhawk Settings:** Visit the Mod Settings tab to change the island's Position (Top, Bottom, Left, Right), Size Scale, Animation Speed, and toggle specific modules on or off.
+- **Windhawk Settings:** Visit the Mod Settings tab to change the island's Position, Size Scale, Animation Speed, and toggle specific modules. You can also perfectly align the island using the new `Offset X` and `Offset Y` settings, and even select exactly which monitor the island should appear on (including a brand new "Follow Mouse" mode!).
 
 ---
 
@@ -77,6 +77,17 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
       - top-left: Top Left
       - top-right: Top Right
       - bottom-center: Bottom Center
+  - TargetMonitor: primary
+    $name: Target Monitor
+    $description: Select the screen to display the island. If a display isn't found, it safely falls back to the Primary Monitor.(Extra Displays are given even if they don't exist because windhawk settings are static)
+    $options:
+      - primary: Primary Monitor
+      - '1': Display 1
+      - '2': Display 2
+      - '3': Display 3
+      - '4': Display 4
+      - '5': Display 5
+      - follow: Follow Mouse (Active Monitor)
   - OffsetX: 0
     $name: Offset X
     $description: Adjust the horizontal position (in pixels). Positive values move it right, negative values move it left.
@@ -271,6 +282,7 @@ enum class AccentMode {
 
 struct Settings {
     Position position = Position::TopCenter;
+    int targetMonitor = 0;
     int offsetX = 0;
     int offsetY = 0;
     float sizeScale = 1.0f;
@@ -637,6 +649,11 @@ void LoadSettings() {
     next.offsetX = Wh_GetIntSetting(L"Appearance.OffsetX");
     next.offsetY = Wh_GetIntSetting(L"Appearance.OffsetY");
 
+    std::wstring mon = GetStringSettingCopy(L"Appearance.TargetMonitor");
+    if (mon == L"primary") next.targetMonitor = 0;
+    else if (mon == L"follow") next.targetMonitor = -1;
+    else next.targetMonitor = _wtoi(mon.c_str());
+
     const int localW11Style = Wh_GetIntValue(L"W11StyleOverride", -1);
     next.w11Style = localW11Style >= 0 ? (localW11Style != 0) : (Wh_GetIntSetting(L"Appearance.W11Style") != 0);
 
@@ -683,11 +700,40 @@ void EnableBlurBehind(HWND hwnd) {
 
 
 
+struct MonitorEnumData {
+    std::vector<HMONITOR> monitors;
+};
+
+BOOL CALLBACK MonitorEnumProc(HMONITOR hMonitor, HDC, LPRECT, LPARAM dwData) {
+    auto* data = reinterpret_cast<MonitorEnumData*>(dwData);
+    data->monitors.push_back(hMonitor);
+    return TRUE;
+}
+
 RECT GetAnchorWorkRect() {
-    POINT pt = {0, 0};
-    HMONITOR monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+    HMONITOR selectedMonitor = nullptr;
+
+    if (g_settings.targetMonitor == -1) {
+        POINT pt = {0, 0};
+        GetCursorPos(&pt);
+        selectedMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    } else if (g_settings.targetMonitor > 0) {
+        MonitorEnumData data;
+        EnumDisplayMonitors(nullptr, nullptr, MonitorEnumProc, reinterpret_cast<LPARAM>(&data));
+        
+        int index = g_settings.targetMonitor - 1;
+        if (index >= 0 && index < static_cast<int>(data.monitors.size())) {
+            selectedMonitor = data.monitors[index];
+        }
+    }
+
+    if (!selectedMonitor) {
+        POINT pt = {0, 0};
+        selectedMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTOPRIMARY);
+    }
+
     MONITORINFO mi = {sizeof(mi)};
-    GetMonitorInfoW(monitor, &mi);
+    GetMonitorInfoW(selectedMonitor, &mi);
     return mi.rcWork;
 }
 
@@ -5411,6 +5457,18 @@ DWORD WINAPI RenderThreadProc(void*) {
             std::abs(heightSpring.velocity) > 0.01f || std::abs(heightSpring.target - heightSpring.value) > 0.01f ||
             std::abs(nudgeSpring.velocity) > 0.01f || std::abs(nudgeSpring.target - nudgeSpring.value) > 0.01f) {
             needsRender = true;
+        }
+
+        // Active Monitor Tracking (Follow Mouse)
+        if (g_settings.targetMonitor == -1) {
+            static HMONITOR s_lastMonitor = nullptr;
+            POINT pt;
+            GetCursorPos(&pt);
+            HMONITOR currentMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            if (currentMonitor != s_lastMonitor) {
+                s_lastMonitor = currentMonitor;
+                g_layoutDirty = true;
+            }
         }
 
         // Check if layout was explicitly invalidated
