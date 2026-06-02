@@ -1,57 +1,77 @@
 # 🏝️ Dynamic Island for Windows
 
-A fluid, highly responsive desktop pill overlay inspired by iPhone's Dynamic Island. Built natively using Windows APIs and hardware-accelerated Direct2D rendering to bring a beautiful, modern, and buttery-smooth 60 FPS notification and media widget directly to your Windows desktop with virtually zero impact on system resources.
+A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Island. It brings a sleek media widget, notifications, and system alerts to Windows without slowing down your PC.
 
 ---
 
-## 📸 Preview & Showcases
+## 📸 See it in Action
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/devcode90/STONIC-3.0/main/Screenshot%202026-05-25%20201746.png" alt="Dynamic Island Preview 1" width="280" style="border-radius: 8px; margin: 10px;"/>
-  <img src="https://raw.githubusercontent.com/devcode90/STONIC-3.0/main/Screenshot%202026-05-25%20201826.png" alt="Dynamic Island Preview 2" width="280" style="border-radius: 8px; margin: 10px;"/>
-  <img src="https://raw.githubusercontent.com/devcode90/STONIC-3.0/main/Screenshot%202026-05-25%20201836.png" alt="Dynamic Island Preview 3" width="280" style="border-radius: 8px; margin: 10px;"/>
-  <img src="https://raw.githubusercontent.com/devcode90/STONIC-3.0/main/Screenshot%202026-05-25%20201852.png" alt="Dynamic Island Preview 4" width="280" style="border-radius: 8px; margin: 10px;"/>
+  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/Full-preview.png" alt="Dynamic Island Preview" width="600" style="border-radius: 8px; margin: 10px;"/>
 </p>
 
----
+### Dashboards
 
-## ✨ Features
+| Media Player | Calendar | Weather | Game Overlay | Idle View |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/media.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/calender.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/weather.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/gamebar.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/idle.png" width="200" /> |
 
-- 🟢 **Hardware Privacy Indicators:** A pulsing orange dot appears when your microphone is active, and a green dot when your camera is in use. Highly optimized polling ensures absolutely zero CPU drain.
-- 🎵 **Rich Media Integration:** Displays high-quality album art, song info, a live audio waveform, and playback controls.
-- 🔒 **Caps Lock & Num Lock Badges:** Sleek real-time visual overlays triggered instantly on Caps Lock or Num Lock press with automated timeout.
-- 🔋 **Premium Battery & Power Alerts:** Beautiful event-driven alerts displaying custom-fluid animated battery icons on plug-in, plug-out, and critical thresholds.
-- 🔌 **USB/Device Connections:** Live, automated status alert widgets with custom Direct2D vector plug graphics for USB drive and COM/Bluetooth device connections.
-- 🎢 **Asymmetric Spring Physics:** Energetic pop expansion physics (380 stiffness) coupled with organic, smooth dampened glide-back transitions.
-- 🖥️ **Windows 11 Fluent Layout:** Toggles on-the-fly into a modern rounded rectangle flyout styling with 1px Fluent borders and dark slate acrylic backgrounds.
-- 📊 **Responsive Game Overlay:** Beautifully aligned real-time GPU, CPU, RAM, Disk, and FPS metrics cards that scale dynamically with your screen resolution.
-- 📋 **High-Res Clipboard & Notifications:** Instantly preview what you copied or view recent Windows notifications, featuring crisp, high-fidelity 64px application icons extracted dynamically from system executables.
-- 🎨 **Customizable Themes:** Switch between sleek OLED Black, Dark Gray, Midnight Blue, Deep Purple, and the premium Fluent Design theme presets, or configure custom Hex accent colors.
+### Privacy Indicators
+
+| Camera Detected | Microphone Detected |
+| :---: | :---: |
+| <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/camera-detected.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/mic-detected.png" width="200" /> |
 
 ---
 
-## ⚙️ Settings & Configuration
+## ✨ What it does
 
-You can customize the mod directly through the **Windhawk settings panel**:
-- **Position:** Place the island at `Top Center`, `Top Left`, `Top Right`, or `Bottom Center`.
-- **Scale:** Scale the widget (`0.8x`, `1.0x`, `1.2x`) to perfectly match your screen resolution and DPI.
-- **Windows 11 Style:** Toggle between the classic iPhone Pill style and the modern Windows 11 Fluent flyout style.
-- **Accent Color:** Select from Auto (based on album art), System, or Custom Hex codes.
-- **Animation Speed:** Adjust between `Slow`, `Normal`, and `Fast` transition speeds.
-- **Toggle Modules:** Enable or disable the Media, Clipboard, Battery, Device, Lock Keys, and Progress modules to tailor the experience to your liking.
+- 🟢 **Privacy Dots:** See an orange dot when your mic is on and a green dot for your camera.
+- 🎵 **Media Player:** Live album art, audio waveforms, and playback controls.
+- 📅 **Dashboards:** Scroll your mouse wheel to easily switch between Media, Calendar, and live Weather (via wttr.in).
+- 🔒 **Key Alerts:** Get quick visual popups when you hit Caps Lock or Num Lock.
+- 🔋 **Battery & Power:** Fluid animations when you plug in, unplug, or hit low battery.
+- 🔌 **Device Status:** Alerts when you plug in a USB drive or connect a Bluetooth device.
+- 🎢 **Bouncy Animations:** Enjoy satisfying spring physics that pop open and smoothly glide back.
+- 🖥️ **Windows 11 Style:** Swap to a modern Fluent design with sleek borders and acrylic backgrounds.
+- 📊 **Game Overlay:** Real-time FPS, CPU, GPU, and RAM stats built right in.
+- 📋 **Clipboard & Notifications:** Instantly preview what you just copied or see your latest Windows notifications.
+- 🎨 **Themes:** Pick from OLED Black, Midnight Blue, Deep Purple, or pick your own hex color.
 
 ---
 
-## 🛠️ Technical Details
+## ⚙️ Customization
 
-This mod is compiled using standard C++23 structures and integrates deeply with native Windows components:
-- **Direct2D Rendering:** Utilizes hardware acceleration for buttery-smooth animations.
-- **Clean COM Implementation:** Solves static analysis include loops and Mingw/Clangd traits mapping.
-- **Highly Performance-Optimized:** Rate-limited polling, low-level event hooks, and efficient system event listening keep background CPU usage at near 0%.
+Tweak the mod easily from the **Windhawk settings panel**:
+- **Position:** Place it Top Center, Top Left, Top Right, or Bottom Center.
+- **Scale:** Shrink or enlarge it to fit your screen perfectly.
+- **Style:** Choose the classic iPhone Pill look or the modern Windows 11 Fluent flyout.
+- **Colors:** Match it to your album art automatically, use system colors, or pick your own.
+- **Speed:** Set animations to Slow, Normal, or Fast.
+- **Modules:** Turn on or off the parts you want (Media, Clipboard, Battery, etc.).
+
+---
+
+## 💬 Let's Chat!
+
+Found a bug? Have a cool feature idea? We want to hear from you! Please drop an issue on our [GitHub Repository](https://github.com/devcode90/Dynamic-Island-for-Windows/issues). Your feedback keeps this mod alive.
+
+---
+
+## 🙌 Shoutouts
+
+- **[ciizerr](https://github.com/ciizerr)**: Massive thanks for fixing UI alignments, smoothing out the dashboard sizing, and polishing the calendar and weather tabs.
+
+---
+
+## 🛠️ Nerd Stuff
+
+Built with C++23 and deeply integrated with Windows for maximum performance:
+- **Direct2D:** Hardware-accelerated rendering for buttery 60 FPS animations.
+- **Zero Lag:** Rate-limited polling and efficient system hooks mean it uses almost 0% CPU in the background.
 
 ---
 
 ## 📜 License
 
-This project is licensed under the [MIT License](LICENSE).
-
+This project uses the [MIT License](LICENSE). Feel free to build on it!
