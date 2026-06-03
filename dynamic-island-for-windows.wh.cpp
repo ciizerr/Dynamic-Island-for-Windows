@@ -81,13 +81,13 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
     $name: Target Monitor
     $description: Select the screen to display the island. If a display isn't found, it safely falls back to the Primary Monitor.(Extra Displays are given even if they don't exist because windhawk settings are static)
     $options:
-      - primary: Primary Monitor
+      - 'primary': Primary Monitor
       - '1': Display 1
       - '2': Display 2
       - '3': Display 3
       - '4': Display 4
       - '5': Display 5
-      - follow: Follow Mouse (Active Monitor)
+      - 'follow': Follow Mouse (Active Monitor)
   - OffsetX: 0
     $name: Offset X
     $description: Adjust the horizontal position (in pixels). Positive values move it right, negative values move it left.
@@ -5019,6 +5019,8 @@ std::vector<IslandKind> ChooseActivities(const SharedState& state, const Setting
 
 constexpr UINT WM_APP_CAPSLOCK = WM_APP + 0x444;
 HHOOK g_keyboardHook = nullptr;
+HANDLE g_keyboardThread = nullptr;
+DWORD g_keyboardThreadId = 0;
 
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION) {
@@ -5032,16 +5034,28 @@ LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     return CallNextHookEx(g_keyboardHook, nCode, wParam, lParam);
 }
 
+DWORD WINAPI KeyboardThreadProc(void*) {
+    g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, nullptr, 0);
+    MSG msg;
+    while (GetMessageW(&msg, nullptr, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+    if (g_keyboardHook) {
+        UnhookWindowsHookEx(g_keyboardHook);
+        g_keyboardHook = nullptr;
+    }
+    return 0;
+}
+
 LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE:
             AddClipboardFormatListener(hwnd);
             RegisterShellHookWindow(hwnd);
-            g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, LowLevelKeyboardProc, nullptr, 0);
             return 0;
 
         case WM_DESTROY:
-            if (g_keyboardHook) UnhookWindowsHookEx(g_keyboardHook);
             RemoveClipboardFormatListener(hwnd);
             DeregisterShellHookWindow(hwnd);
             return 0;
@@ -5590,6 +5604,7 @@ bool StartThreads() {
     g_mediaThread = CreateThread(nullptr, 0, MediaThreadProc, nullptr, 0, nullptr);
     g_audioThread = CreateThread(nullptr, 0, AudioThreadProc, nullptr, 0, nullptr);
     g_weatherThread = CreateThread(nullptr, 0, WeatherThreadProc, nullptr, 0, nullptr);
+    g_keyboardThread = CreateThread(nullptr, 0, KeyboardThreadProc, nullptr, 0, &g_keyboardThreadId);
 #if DYNAMIC_ISLAND_HAS_USER_NOTIFICATION_LISTENER
     g_notificationThread = CreateThread(nullptr, 0, NotificationThreadProc, nullptr, 0, nullptr);
 #endif
@@ -5598,11 +5613,14 @@ bool StartThreads() {
 }
 
 void StopThreads() {
+    if (g_keyboardThreadId != 0) {
+        PostThreadMessageW(g_keyboardThreadId, WM_QUIT, 0, 0);
+    }
     if (g_stopEvent) {
         SetEvent(g_stopEvent);
     }
 
-    HANDLE handles[] = {g_renderThread, g_mediaThread, g_audioThread, g_weatherThread, g_notificationThread};
+    HANDLE handles[] = {g_renderThread, g_mediaThread, g_audioThread, g_weatherThread, g_notificationThread, g_keyboardThread};
     for (HANDLE handle : handles) {
         if (handle) {
             WaitForSingleObject(handle, 3000);
@@ -5615,6 +5633,8 @@ void StopThreads() {
     g_audioThread = nullptr;
     g_weatherThread = nullptr;
     g_notificationThread = nullptr;
+    g_keyboardThread = nullptr;
+    g_keyboardThreadId = 0;
 
     if (g_stopEvent) {
         CloseHandle(g_stopEvent);
