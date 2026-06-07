@@ -1,7 +1,0 @@
-feat: implement click-to-expand and persistent media pill
-
-- Added 'Expand on Hover' toggle to Settings and Right-Click Context Menu.
-- When 'Expand on Hover' is disabled, the island provides tactile scaling on hover but requires an explicit left-click to fully expand. Moving the mouse away gracefully collapses it.
-- Improved media pill persistence: The media pill is no longer hidden when playback is paused. It will now remain active and visible indefinitely as long as the underlying media application session is alive.
-
-Fixes https://github.com/devcode90/Dynamic-Island-for-Windows/issues/18

@@ -106,6 +106,16 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
       - '1.8': 1.8x
       - '2.0': 2.0x
       - '2.5': 2.5x
+  - AutoHideIdleSeconds: 0
+    $name: Auto-hide idle island
+    $description: Hide the idle pill after this many seconds of inactivity. 0 to disable.
+    $options:
+      - '-1': Hide instantly
+      - '0': Never hide (default)
+      - '5': Hide after 5 seconds
+      - '10': Hide after 10 seconds
+      - '30': Hide after 30 seconds
+      - '60': Hide after 60 seconds
   - AutoDpiScale: true
     $name: Auto DPI scaling
     $description: Automatically scales the island to match your monitor's DPI. Recommended for 4K screens.
@@ -166,9 +176,7 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
   - Progress: true
     $name: Progress module
     $description: Shows a progress ring around the island for downloads or file copies.
-  - AlwaysShowClock: true
-    $name: Always show dynamic island
-    $description: Shows a minimal clock and system stats when nothing else is happening.
+
   - GameOverlay: false
     $name: Enable game overlay mode
     $description: Replaces the clock with live stats like FPS, CPU, and RAM usage.
@@ -178,6 +186,9 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
   - WeatherCity: ""
     $name: Weather City (Optional)
     $description: Enter your city (e.g. London). Leave blank to use auto IP geolocation.
+  - WeatherFahrenheit: false
+    $name: Use Fahrenheit
+    $description: Display weather temperature and wind speed in imperial units.
   $name: Modules & Features
 */
 // ==/WindhawkModSettings==
@@ -302,7 +313,8 @@ struct Settings {
     bool gameOverlay = false;
     bool showMetricText = true;
     std::wstring weatherCity;
-    bool alwaysShowClock = true;
+    bool weatherFahrenheit = false;
+    int autoHideIdleSeconds = 0;
     bool alwaysOnTop = true;
     bool expandOnHover = true;
     bool autoDpiScale = true;
@@ -648,7 +660,9 @@ void LoadSettings() {
     next.gameOverlay = Wh_GetIntSetting(L"Modules.GameOverlay") != 0;
     next.showMetricText = Wh_GetIntSetting(L"Modules.ShowMetricText") != 0;
     next.weatherCity = GetStringSettingCopy(L"Modules.WeatherCity");
-    next.alwaysShowClock = Wh_GetIntSetting(L"Modules.AlwaysShowClock") != 0;
+    next.weatherFahrenheit = Wh_GetIntSetting(L"Modules.WeatherFahrenheit") != 0;
+    const std::wstring hideSec = GetStringSettingCopy(L"Appearance.AutoHideIdleSeconds");
+    next.autoHideIdleSeconds = hideSec.empty() ? 0 : _wtoi(hideSec.c_str());
     next.alwaysOnTop = Wh_GetIntSetting(L"Appearance.AlwaysOnTop") != 0;
     const int localExpandOnHover = Wh_GetIntValue(L"ExpandOnHoverOverride", -1);
     next.expandOnHover = localExpandOnHover >= 0 ? (localExpandOnHover != 0) : (Wh_GetIntSetting(L"Appearance.ExpandOnHover") != 0);
@@ -1814,9 +1828,11 @@ DWORD WINAPI WeatherThreadProc(void*) {
 
     while (WaitForSingleObject(g_stopEvent, 0) == WAIT_TIMEOUT) {
         std::wstring cityOverride;
+        bool isFahrenheit = false;
         {
             std::lock_guard lock(g_stateMutex);
             cityOverride = g_settings.weatherCity;
+            isFahrenheit = g_settings.weatherFahrenheit;
         }
 
         std::wstring url = L"/?format=j1";
@@ -1887,7 +1903,7 @@ DWORD WINAPI WeatherThreadProc(void*) {
                     }
                 };
 
-                const char* tempStr = strstr(currentStr, "\"temp_C\":");
+                const char* tempStr = strstr(currentStr, isFahrenheit ? "\"temp_F\":" : "\"temp_C\":");
                 if (tempStr) {
                     tempStr += 9;
                     while (*tempStr == ' ' || *tempStr == '\"') tempStr++;
@@ -1920,13 +1936,13 @@ DWORD WINAPI WeatherThreadProc(void*) {
                     }
                 }
                 
-                ParseStringField("\"windspeedKmph\"", windSpeed);
+                ParseStringField(isFahrenheit ? "\"windspeedMiles\"" : "\"windspeedKmph\"", windSpeed);
                 ParseStringField("\"winddir16Point\"", windDir);
                 ParseStringField("\"humidity\"", humidity);
-                ParseStringField("\"FeelsLikeC\"", feelsLike);
+                ParseStringField(isFahrenheit ? "\"FeelsLikeF\"" : "\"FeelsLikeC\"", feelsLike);
 
                 std::wstring finalCity = cityOverride.empty() ? cityLabel : cityOverride;
-                Wh_Log(L"Weather parsed success: city=%s, temp=%.1fC, feelsLike=%sC, humidity=%s%%, desc=%s",
+                Wh_Log(L"Weather parsed success: city=%s, temp=%.1f, feelsLike=%s, humidity=%s%%, desc=%s",
                        finalCity.c_str(), temp, feelsLike.c_str(), humidity.c_str(), desc.c_str());
             } else {
                 Wh_Log(L"Weather: Failed to find \"current_condition\" in response.");
@@ -3594,7 +3610,7 @@ class Renderer {
         target_->DrawTextW(desc.c_str(), static_cast<UINT32>(desc.length()), smallTextFormat_.Get(),
                            rightMid, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
                            
-        std::wstring line3 = hasWeather ? L"Wind: " + state.weather.windSpeed + L" km/h " + state.weather.windDir : L"Updated recently";
+        std::wstring line3 = hasWeather ? L"Wind: " + state.weather.windSpeed + (settings.weatherFahrenheit ? L" mph " : L" km/h ") + state.weather.windDir : L"Updated recently";
         std::wstring line4 = hasWeather ? L"Feels Like: " + state.weather.feelsLike + L"\x00B0" : L"";
         std::wstring line5 = hasWeather ? L"Humidity: " + state.weather.humidity + L"%" : L"";
 
@@ -3618,7 +3634,7 @@ class Renderer {
             return;
         }
         bool privacyActive = state.system.micActive || state.system.cameraActive;
-        if ((!settings.alwaysShowClock && !privacyActive) || !clockFormat_) return;
+        if (!clockFormat_) return;
 
         SYSTEMTIME local = {};
         GetLocalTime(&local);
@@ -5198,7 +5214,7 @@ Activity ActivityForKind(IslandKind kind, const Settings& settings, const Shared
             break;
         case IslandKind::Idle:
         default:
-            if (!settings.alwaysShowClock && !state.system.micActive && !state.system.cameraActive) {
+            if (settings.autoHideIdleSeconds == -1 && !state.system.micActive && !state.system.cameraActive) {
                 activity.width = 0.0f;
                 activity.height = 0.0f;
             } else {
@@ -5540,8 +5556,8 @@ DWORD WINAPI RenderThreadProc(void*) {
     SpringValue widthSpring;
     SpringValue heightSpring;
     SpringValue nudgeSpring;
-    widthSpring.Reset((g_settings.alwaysShowClock ? 120.0f : 0.0f) * g_settings.sizeScale);
-    heightSpring.Reset((g_settings.alwaysShowClock ? 36.0f : 0.0f) * g_settings.sizeScale);
+    widthSpring.Reset((g_settings.autoHideIdleSeconds == -1 ? 0.0f : 120.0f) * g_settings.sizeScale);
+    heightSpring.Reset((g_settings.autoHideIdleSeconds == -1 ? 0.0f : 36.0f) * g_settings.sizeScale);
     nudgeSpring.Reset(0.0f);
 
     IslandKind previousPrimary = IslandKind::Idle;
@@ -5642,10 +5658,26 @@ DWORD WINAPI RenderThreadProc(void*) {
         }
         bool isHoverExpanded = g_settings.expandOnHover ? hover : (hover && g_clickExpanded.load());
 
+        static double lastInteractionTime = NowSeconds();
+        if (isHoverExpanded || pinned || primary.kind != IslandKind::Idle) {
+            lastInteractionTime = now;
+        }
+        bool isHidden = false;
+        if (g_settings.autoHideIdleSeconds == -1) {
+            isHidden = true;
+        } else if (g_settings.autoHideIdleSeconds > 0) {
+            isHidden = (now - lastInteractionTime > g_settings.autoHideIdleSeconds);
+        }
+
         bool privacyActive = snapshot.system.micActive || snapshot.system.cameraActive;
-        if (primary.kind == IslandKind::Idle && (pinned || (isHoverExpanded && (g_settings.alwaysShowClock || privacyActive)))) {
-            primary.width = 380.0f * g_settings.sizeScale;
-            primary.height = 184.0f * g_settings.sizeScale;
+        if (primary.kind == IslandKind::Idle) {
+            if (pinned || isHoverExpanded) {
+                primary.width = 380.0f * g_settings.sizeScale;
+                primary.height = 184.0f * g_settings.sizeScale;
+            } else if (isHidden && !privacyActive) {
+                primary.width = 0.0f;
+                primary.height = 0.0f;
+            }
         }
         if (primary.kind == IslandKind::Idle &&
             (g_settings.gameOverlay || Wh_GetIntValue(L"GameOverlayPinned", 0) != 0)) {
@@ -5767,7 +5799,7 @@ DWORD WINAPI RenderThreadProc(void*) {
         
         // Idle dashboard clock changes once a minute
         static SYSTEMTIME prevTime = {};
-        if (primary.kind == IslandKind::Idle && g_settings.alwaysShowClock) {
+        if (primary.kind == IslandKind::Idle && !isHidden) {
             SYSTEMTIME local = {};
             GetLocalTime(&local);
             if (local.wMinute != prevTime.wMinute) {
