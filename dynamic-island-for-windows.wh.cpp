@@ -106,7 +106,7 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
       - '1.8': 1.8x
       - '2.0': 2.0x
       - '2.5': 2.5x
-  - AutoHideIdleSeconds: 0
+  - AutoHideIdleSeconds: '0'
     $name: Auto-hide idle island
     $description: Hide the idle pill after this many seconds of inactivity. 0 to disable.
     $options:
@@ -116,6 +116,9 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
       - '10': Hide after 10 seconds
       - '30': Hide after 30 seconds
       - '60': Hide after 60 seconds
+  - UnhideOnHover: true
+    $name: Unhide on hover
+    $description: Allow the hidden island to reappear when you hover your mouse over it.
   - AutoDpiScale: true
     $name: Auto DPI scaling
     $description: Automatically scales the island to match your monitor's DPI. Recommended for 4K screens.
@@ -176,7 +179,6 @@ The Dynamic Island intelligently expands to display context-aware dashboards. Yo
   - Progress: true
     $name: Progress module
     $description: Shows a progress ring around the island for downloads or file copies.
-
   - GameOverlay: false
     $name: Enable game overlay mode
     $description: Replaces the clock with live stats like FPS, CPU, and RAM usage.
@@ -315,6 +317,7 @@ struct Settings {
     std::wstring weatherCity;
     bool weatherFahrenheit = false;
     int autoHideIdleSeconds = 0;
+    bool unhideOnHover = true;
     bool alwaysOnTop = true;
     bool expandOnHover = true;
     bool autoDpiScale = true;
@@ -663,6 +666,7 @@ void LoadSettings() {
     next.weatherFahrenheit = Wh_GetIntSetting(L"Modules.WeatherFahrenheit") != 0;
     const std::wstring hideSec = GetStringSettingCopy(L"Appearance.AutoHideIdleSeconds");
     next.autoHideIdleSeconds = hideSec.empty() ? 0 : _wtoi(hideSec.c_str());
+    next.unhideOnHover = Wh_GetIntSetting(L"Appearance.UnhideOnHover") != 0;
     next.alwaysOnTop = Wh_GetIntSetting(L"Appearance.AlwaysOnTop") != 0;
     const int localExpandOnHover = Wh_GetIntValue(L"ExpandOnHoverOverride", -1);
     next.expandOnHover = localExpandOnHover >= 0 ? (localExpandOnHover != 0) : (Wh_GetIntSetting(L"Appearance.ExpandOnHover") != 0);
@@ -3582,48 +3586,54 @@ class Renderer {
         if (hasWeather) swprintf_s(wTemp, L"%.0f\x00B0", state.weather.temperature);
         else wcscpy_s(wTemp, L"--\x00B0");
 
+        std::wstring city = hasWeather ? state.weather.city : L"Locating...";
+        std::wstring desc = wText;
+
         textBrush_->SetOpacity(0.96f);
+        // City Name
+        target_->DrawTextW(city.c_str(), static_cast<UINT32>(city.length()), boldTextFormat_.Get(),
+                           D2D1::RectF(rect.left + 35.0f * scale, rect.top + 35.0f * scale, rect.left + 185.0f * scale, rect.bottom),
+                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        // Weather Icon
         target_->DrawTextW(wIcon.c_str(), static_cast<UINT32>(wIcon.length()), hugeTextFormat_.Get(),
-                           D2D1::RectF(rect.left + 20.0f * scale, rect.top + 34.0f * scale, rect.left + 100.0f * scale, rect.bottom),
-                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                           D2D1::RectF(rect.left + 35.0f * scale, rect.top + 60.0f * scale, rect.left + 95.0f * scale, rect.bottom),
+                           textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
                            
+        // Temperature
         target_->DrawTextW(wTemp, static_cast<UINT32>(wcslen(wTemp)), hugeTextFormat_.Get(),
-                           D2D1::RectF(rect.left + 85.0f * scale, rect.top + 34.0f * scale, rect.left + 180.0f * scale, rect.bottom),
+                           D2D1::RectF(rect.left + 95.0f * scale, rect.top + 60.0f * scale, rect.left + 185.0f * scale, rect.bottom),
                            textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        mutedBrush_->SetOpacity(0.85f);
+        // Description
+        target_->DrawTextW(desc.c_str(), static_cast<UINT32>(desc.length()), textFormat_.Get(),
+                           D2D1::RectF(rect.left + 35.0f * scale, rect.top + 120.0f * scale, rect.left + 185.0f * scale, rect.bottom),
+                           mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
 
         ComPtr<ID2D1SolidColorBrush> divider;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.12f * settingsOpacity_), &divider);
         target_->FillRoundedRectangle(
-            D2D1::RoundedRect(D2D1::RectF(rect.left + 185.0f * scale, rect.top + 20.0f * scale,
-                                           rect.left + 186.5f * scale, rect.bottom - 24.0f * scale),
+            D2D1::RoundedRect(D2D1::RectF(rect.left + 190.0f * scale, rect.top + 30.0f * scale,
+                                           rect.left + 191.5f * scale, rect.bottom - 34.0f * scale),
                               0.5f * scale, 0.5f * scale), divider.Get());
 
-        std::wstring city = hasWeather ? state.weather.city : L"Locating...";
-        std::wstring desc = wText;
-        
-        D2D1_RECT_F rightTop = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 28.0f * scale, rect.right, rect.bottom);
-        target_->DrawTextW(city.c_str(), static_cast<UINT32>(city.length()), boldTextFormat_.Get(),
-                           rightTop, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
-                           
-        mutedBrush_->SetOpacity(0.70f);
-        D2D1_RECT_F rightMid = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 48.0f * scale, rect.right, rect.bottom);
-        target_->DrawTextW(desc.c_str(), static_cast<UINT32>(desc.length()), smallTextFormat_.Get(),
-                           rightMid, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
-                           
         std::wstring line3 = hasWeather ? L"Wind: " + state.weather.windSpeed + (settings.weatherFahrenheit ? L" mph " : L" km/h ") + state.weather.windDir : L"Updated recently";
         std::wstring line4 = hasWeather ? L"Feels Like: " + state.weather.feelsLike + L"\x00B0" : L"";
         std::wstring line5 = hasWeather ? L"Humidity: " + state.weather.humidity + L"%" : L"";
 
-        D2D1_RECT_F rightLine3 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 68.0f * scale, rect.right, rect.bottom);
-        target_->DrawTextW(line3.c_str(), static_cast<UINT32>(line3.length()), smallTextFormat_.Get(),
+        mutedBrush_->SetOpacity(0.70f);
+        
+        D2D1_RECT_F rightLine3 = D2D1::RectF(rect.left + 215.0f * scale, rect.top + 55.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line3.c_str(), static_cast<UINT32>(line3.length()), textFormat_.Get(),
                            rightLine3, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
                            
-        D2D1_RECT_F rightLine4 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 88.0f * scale, rect.right, rect.bottom);
-        target_->DrawTextW(line4.c_str(), static_cast<UINT32>(line4.length()), smallTextFormat_.Get(),
+        D2D1_RECT_F rightLine4 = D2D1::RectF(rect.left + 215.0f * scale, rect.top + 85.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line4.c_str(), static_cast<UINT32>(line4.length()), textFormat_.Get(),
                            rightLine4, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
                            
-        D2D1_RECT_F rightLine5 = D2D1::RectF(rect.left + 205.0f * scale, rect.top + 108.0f * scale, rect.right, rect.bottom);
-        target_->DrawTextW(line5.c_str(), static_cast<UINT32>(line5.length()), smallTextFormat_.Get(),
+        D2D1_RECT_F rightLine5 = D2D1::RectF(rect.left + 215.0f * scale, rect.top + 115.0f * scale, rect.right, rect.bottom);
+        target_->DrawTextW(line5.c_str(), static_cast<UINT32>(line5.length()), textFormat_.Get(),
                            rightLine5, mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
     }
 
@@ -3633,6 +3643,8 @@ class Renderer {
             DrawGameOverlay(state, rect, 1.0f);
             return;
         }
+        target_->PushAxisAlignedClip(rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        
         bool privacyActive = state.system.micActive || state.system.cameraActive;
         if (!clockFormat_) return;
 
@@ -3674,8 +3686,9 @@ class Renderer {
             D2D1_RECT_F wRect = D2D1::RectF(rect.left + 94.0f * scale, rect.top + 7.0f * scale,
                                             rect.right, rect.bottom - 7.0f * scale);
             target_->DrawTextW(weatherLabel, static_cast<UINT32>(wcslen(weatherLabel)), smallTextFormat_.Get(),
-                               wRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                               wRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT);
             textBrush_->SetOpacity(1.0f);
+            target_->PopAxisAlignedClip();
             return;
         }
 
@@ -3704,6 +3717,8 @@ class Renderer {
 
         target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY - spacing * 0.5f), r, r), tab == 0 ? activeDot.Get() : inactiveDot.Get());
         target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, dotY + spacing * 0.5f), r, r), tab == 1 ? activeDot.Get() : inactiveDot.Get());
+
+        target_->PopAxisAlignedClip();
     }
 
     void DrawGameOverlay(const SharedState& state, D2D1_RECT_F rect, float unused_scale) {
@@ -5656,12 +5671,22 @@ DWORD WINAPI RenderThreadProc(void*) {
             g_clickExpanded = false;
             needsRender = true;
         }
-        bool isHoverExpanded = g_settings.expandOnHover ? hover : (hover && g_clickExpanded.load());
-
         static double lastInteractionTime = NowSeconds();
-        if (isHoverExpanded || pinned || primary.kind != IslandKind::Idle) {
+        bool currentlyHidden = false;
+        if (g_settings.autoHideIdleSeconds == -1) {
+            currentlyHidden = true;
+        } else if (g_settings.autoHideIdleSeconds > 0) {
+            currentlyHidden = (now - lastInteractionTime > g_settings.autoHideIdleSeconds);
+        }
+
+        bool isHoverExpanded = g_settings.expandOnHover ? hover : (hover && g_clickExpanded.load());
+        
+        if (currentlyHidden && !g_settings.unhideOnHover && primary.kind == IslandKind::Idle) {
+            isHoverExpanded = false;
+        } else if (isHoverExpanded || pinned || primary.kind != IslandKind::Idle) {
             lastInteractionTime = now;
         }
+        
         bool isHidden = false;
         if (g_settings.autoHideIdleSeconds == -1) {
             isHidden = true;
