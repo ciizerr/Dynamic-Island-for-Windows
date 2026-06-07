@@ -503,6 +503,8 @@ HANDLE g_notificationThread = nullptr;
 std::atomic<bool> g_running = false;
 std::atomic<int> g_idleTab = 0;
 std::atomic<bool> g_layoutDirty = true;
+std::atomic<bool> g_clickExpanded = false;
+std::atomic<int> g_pressedMediaButton = -1;
 FILETIME g_prevIdleTime = {};
 FILETIME g_prevKernelTime = {};
 FILETIME g_prevUserTime = {};
@@ -3033,13 +3035,17 @@ class Renderer {
         if (width >= 2.0f && height >= 2.0f) {
             if (secondary) {
                 const float gap = 12.0f * settings.sizeScale;
+                const float maxH = std::max(primary.height, secondary->height);
+                const float pTop = top + (maxH - primary.height) * 0.5f;
+                const float sTop = top + (maxH - secondary->height) * 0.5f;
+
                 DrawPill(state, settings, primary,
-                         D2D1::RectF(left, top, left + primary.width, top + primary.height),
+                         D2D1::RectF(left, pTop, left + primary.width, pTop + primary.height),
                          scale, now);
                 DrawPill(state, settings, *secondary,
-                         D2D1::RectF(left + primary.width + gap, top,
+                         D2D1::RectF(left + primary.width + gap, sTop,
                                       left + primary.width + gap + secondary->width,
-                                      top + secondary->height),
+                                      sTop + secondary->height),
                          scale, now);
             } else {
                 DrawPill(state, settings, primary,
@@ -4404,10 +4410,17 @@ class Renderer {
     }
 
     void DrawMediaButton(D2D1_POINT_2F center, float radius, int kind, bool primary) {
+        int buttonCmd = (kind == 0) ? 0 : ((kind == 1 || kind == 2) ? 1 : 2);
+        bool isPressed = (g_pressedMediaButton.load() == buttonCmd);
+
+        if (isPressed) {
+            radius *= 0.88f; // Shrink by 12% on click
+        }
+
         ComPtr<ID2D1SolidColorBrush> bg;
-        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, primary ? 0.080f : 0.040f), &bg);
+        target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, primary ? (isPressed ? 0.16f : 0.080f) : (isPressed ? 0.10f : 0.040f)), &bg);
         target_->FillEllipse(D2D1::Ellipse(center, radius, radius), bg.Get());
-        accentBrush_->SetOpacity(primary ? 0.88f : 0.62f);
+        accentBrush_->SetOpacity(primary ? (isPressed ? 1.0f : 0.88f) : (isPressed ? 0.80f : 0.62f));
 
         if (kind == 1) {  // pause
             const float h = radius * 0.72f;
@@ -4424,9 +4437,14 @@ class Renderer {
         } else {
             const float dir = kind == 0 ? -1.0f : 1.0f;
             const float tri = radius * (primary ? 0.70f : 0.62f);
-            D2D1_POINT_2F p1 = D2D1::Point2F(center.x - dir * tri * 0.35f, center.y - tri * 0.58f);
-            D2D1_POINT_2F p2 = D2D1::Point2F(center.x - dir * tri * 0.35f, center.y + tri * 0.58f);
-            D2D1_POINT_2F p3 = D2D1::Point2F(center.x + dir * tri * 0.55f, center.y);
+            
+            // The combined bounding box of the triangle and the line is not centered.
+            // We apply a slight horizontal shift to perfectly center the next/prev icons inside the circle.
+            const float cx = (kind == 0 || kind == 3) ? center.x - dir * radius * 0.16f : center.x;
+
+            D2D1_POINT_2F p1 = D2D1::Point2F(cx - dir * tri * 0.35f, center.y - tri * 0.58f);
+            D2D1_POINT_2F p2 = D2D1::Point2F(cx - dir * tri * 0.35f, center.y + tri * 0.58f);
+            D2D1_POINT_2F p3 = D2D1::Point2F(cx + dir * tri * 0.55f, center.y);
             ComPtr<ID2D1PathGeometry> geom;
             d2dFactory_->CreatePathGeometry(&geom);
             ComPtr<ID2D1GeometrySink> sink;
@@ -4439,7 +4457,7 @@ class Renderer {
             target_->FillGeometry(geom.Get(), accentBrush_.Get());
 
             if (kind == 0 || kind == 3) {
-                const float x = center.x + dir * radius * 0.55f;
+                const float x = cx + dir * radius * 0.55f;
                 target_->DrawLine(D2D1::Point2F(x, center.y - radius * 0.45f),
                                   D2D1::Point2F(x, center.y + radius * 0.45f),
                                   accentBrush_.Get(), 1.5f);
@@ -5280,7 +5298,6 @@ std::vector<IslandKind> ChooseActivities(const SharedState& state, const Setting
 }
 
 constexpr UINT WM_APP_CAPSLOCK = WM_APP + 0x444;
-std::atomic<bool> g_clickExpanded{false};
 HHOOK g_keyboardHook = nullptr;
 HANDLE g_keyboardThread = nullptr;
 DWORD g_keyboardThreadId = 0;
@@ -5385,8 +5402,55 @@ LRESULT CALLBACK OverlayWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             g_layoutDirty = true;
             return 0;
 
+        case WM_LBUTTONDOWN:
+            {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
+                
+                bool mediaActive = false;
+                {
+                    std::lock_guard lock(g_stateMutex);
+                    mediaActive = g_settings.media && g_state.media.available;
+                }
+
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                const float height = static_cast<float>(clientRect.bottom - clientRect.top);
+                const float width = static_cast<float>(clientRect.right - clientRect.left);
+
+                if (mediaActive && height > 60.0f && (g_idleTab % 3) == 0) {
+                    float totalScale = (GetDpiForWindow(hwnd) / 96.0f) * g_settings.sizeScale;
+                    float cx = width / 2.0f;
+                    float cy = height / 2.0f;
+                    
+                    float unX = (xPos - cx) / totalScale;
+                    float unY = (yPos - cy) / totalScale;
+
+                    if (unY > 56.0f - 30.0f && unY < 56.0f + 30.0f) {
+                        int cmd = -1;
+                        if (unX > -84.0f && unX < -44.0f) cmd = 0; // Prev
+                        else if (unX > -24.0f && unX < 24.0f) cmd = 1; // Play/Pause
+                        else if (unX > 44.0f && unX < 84.0f) cmd = 2; // Next
+
+                        if (cmd != -1) {
+                            g_pressedMediaButton = cmd;
+                            SetCapture(hwnd);
+                            g_layoutDirty = true;
+                            return 0;
+                        }
+                    }
+                }
+            }
+            break;
+
         case WM_LBUTTONUP:
             {
+                if (g_pressedMediaButton.load() != -1) {
+                    g_pressedMediaButton = -1;
+                    ReleaseCapture();
+                    g_layoutDirty = true;
+                }
+
                 int xPos = GET_X_LPARAM(lParam);
                 int yPos = GET_Y_LPARAM(lParam);
                 
