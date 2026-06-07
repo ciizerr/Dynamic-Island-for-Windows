@@ -2712,10 +2712,51 @@ void OpenRelevantApp() {
         }
     }
 
-    // Fallback: Launch or focus via AppUserModelId
+    // Fallback: Launch or focus via AppUserModelId or Path
     if (!app.empty()) {
-        std::wstring shellPath = L"shell:AppsFolder\\" + app;
-        ShellExecuteW(nullptr, L"open", shellPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        std::wstring executePath = app;
+        
+        // Remove surrounding quotes if any
+        if (executePath.size() >= 2 && executePath.front() == L'"' && executePath.back() == L'"') {
+            executePath = executePath.substr(1, executePath.size() - 2);
+        }
+
+        bool isFilePath = (executePath.find(L":\\") != std::wstring::npos || 
+                           (executePath.size() >= 4 && executePath.substr(executePath.size() - 4) == L".exe"));
+
+        if (isFilePath) {
+            if (GetFileAttributesW(executePath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+                // Path doesn't exist. Try 64-bit Program Files if it was in x86
+                size_t x86Pos = executePath.find(L" (x86)");
+                if (x86Pos != std::wstring::npos) {
+                    std::wstring altPath = executePath;
+                    altPath.erase(x86Pos, 6);
+                    if (GetFileAttributesW(altPath.c_str()) != INVALID_FILE_ATTRIBUTES) {
+                        executePath = altPath;
+                    }
+                }
+                
+                // If it STILL doesn't exist after trying alternatives, just gracefully abort!
+                // Trying to guess 'brave.exe' triggers broken Windows Registry App Paths.
+                if (GetFileAttributesW(executePath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+                    return;
+                }
+            }
+            
+            SHELLEXECUTEINFOW sei = { sizeof(sei) };
+            sei.fMask = SEE_MASK_FLAG_NO_UI;
+            sei.lpFile = executePath.c_str();
+            sei.nShow = SW_SHOWNORMAL;
+            ShellExecuteExW(&sei);
+        } else {
+            // It's a UWP/Desktop AppUserModelId, launch via AppsFolder
+            std::wstring shellPath = L"shell:AppsFolder\\" + executePath;
+            SHELLEXECUTEINFOW sei = { sizeof(sei) };
+            sei.fMask = SEE_MASK_FLAG_NO_UI;
+            sei.lpFile = shellPath.c_str();
+            sei.nShow = SW_SHOWNORMAL;
+            ShellExecuteExW(&sei);
+        }
         return;
     }
 
