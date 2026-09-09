@@ -27,7 +27,8 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 ## ✨ What it does
 
 **🚀 New Features (Added in Latest Update):**
-- 📺 **Full-Screen Autohide:** Smart autohide ensures the island stays completely out of your way during full-screen apps, videos, and gaming. 
+
+- 📺 **Full-Screen Autohide:** Smart autohide ensures the island stays completely out of your way during full-screen apps, videos, and gaming.
 - 🙈 **Instant Hide/Unhide:** Toggle the island visibility instantly with a customizable shortcut (Default: `Ctrl+Alt+D`). It consumes almost no CPU while hidden!
 - 🕒 **Expandable Hover Clock:** Hover over the island to instantly expand a sleek clock displaying the current time and date.
 - ⏱️ **Built-in Focus Timer:** Stay productive by launching a focus timer anytime simply by right-clicking the island.
@@ -36,28 +37,31 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 - 🖼️ **Image Clipboard Thumbnails:** Instantly preview a thumbnail of any image you copy to your clipboard. It's highly optimized and adds zero load to your system.
 
 **Core Features:**
+
 - 🟢 **Privacy Dots:** See an orange dot when your mic is on and a green dot for your camera.
 - 📅 **Dashboards:** Scroll your mouse wheel to easily switch between Media, Calendar, and live Weather (via wttr.in).
 - 🔒 **Key Alerts:** Get quick visual popups when you hit Caps Lock or Num Lock.
 - 🔋 **Battery & Power:** Fluid animations when you plug in, unplug, or hit low battery.
 - 🔌 **USB Status:** Visual alerts whenever you plug in a USB drive.
 - 🎢 **360Hz+ Fluid Animations:** Ultra-smooth spring physics with support for high refresh rate monitors (up to 360Hz/500Hz+) with zero idle CPU drain.
-- 🖥️ **Windows 11 Style:** Swap to a modern Fluent design with sleek borders and acrylic backgrounds. 
+- 🖥️ **Windows 11 Style:** Swap to a modern Windows 11 Fluent style.
 - 📊 **Game Overlay:** Real-time FPS, CPU, GPU, and RAM stats built right in.
 - 📋 **Text & Notifications:** Instantly preview your text clipboard history or see your latest Windows notifications.
-- 🎨 **Themes:** Pick from OLED Black, Midnight Blue, Deep Purple, or pick your own hex color.
+- 🎨 **Themes & Fonts:** Pick from OLED Black, Dark Gray, Midnight Blue, Deep Purple, Fluent (Windows 11), or customize your own palette and use custom font families.
+
 ---
 
 ## ⚙️ Customization
 
 Tweak the mod easily from the **Windhawk settings panel**:
+
 - **Position:** Place it Top Center, Top Left, Top Right, or Bottom Center.
-- **Scale:** Shrink or enlarge it to fit your screen perfectly.
+- **Scale & Fonts:** Adjust the size scale and specify any custom font family with automatic system fallbacks.
 - **Shortcuts:** Customize your keyboard shortcuts, including the instant hide/unhide toggle (Default: `Ctrl+Alt+D`).
-- **Style:** Choose the classic iPhone Pill look or the modern Windows 11 Fluent flyout.
-- **Colors:** Match it to your album art automatically, use system colors, or pick your own.
-- **Refresh Rate & Animations:** Dynamically match your active monitor refresh rate (up to 360Hz/500Hz+), pick your animation style (Smooth, Default, Bouncy, or Snappy), and fine-tune animation speed across 6 granular levels.
-- **Modules:** Turn on or off the parts you want (Media, Clipboard, Battery, etc.).
+- **Style:** Choose the classic iPhone Pill look, macOS Notch, or modern Windows 11 style.
+- **Themes & Colors:** Choose built-in presets (with matching borders), set custom palette colors, or let album art dynamically tint the island.
+- **Refresh Rate & Animations:** Match your display's refresh rate (up to 360Hz/500Hz+), select physics styles (Smooth, Default, Bouncy, Snappy), and fine-tune animation speeds.
+- **Modules & Visibility:** Configure media, dashboards, privacy dots, system flyouts, auto-hide idle behavior, and shortcuts.
 - **Process Inclusion (for Notifications):** To use the notification module, you must add `explorer.exe` to the process inclusion list under the **Advanced** tab of the mod settings in Windhawk, then restart the mod.
 
 ---
@@ -73,6 +77,7 @@ Found a bug? Have a cool feature idea? We want to hear from you! Please drop an 
 - **[Sarthak Singh (sarthakaksh)](https://github.com/sarthakaksh)**: Major feature overhaul including the right-click focus timer, hover clock, robust media controls, zero-CPU instant hide shortcut, Bluetooth battery integration, image clipboard thumbnails, and full-screen autohide fixes.
 - **[ciizerr](https://github.com/ciizerr)**: Massive thanks for fixing UI alignments, smoothing out the dashboard sizing, and polishing the calendar and weather tabs.
 - **[ChrisSch-dev @GitHub](https://github.com/ChrisSch-dev)**: Added album title support, word wrapping for weather descriptions, sleep resume fixes, and various performance/movement stability improvements.
+- **[thevioletto @GitHub](https://github.com/thevioletto)**: Added custom font support, improved album art color extraction, reorganized settings into logical categories, and fixed various UI, media, and theme edge cases.
 
 ---
 
@@ -90,6 +95,7 @@ We love community contributions! If you want to add a feature or fix a bug, plea
 ## 🛠️ Nerd Stuff
 
 Built with C++23 and deeply integrated with Windows for maximum performance:
+
 - **Direct2D & High Refresh Rate Pacing:** Hardware-accelerated rendering with intelligent 1ms timer resolution and zero-spin frame pacing for buttery smooth animations up to 360Hz/500Hz+.
 - **Zero Lag:** Rate-limited polling and efficient system hooks mean it uses almost 0% CPU in the background.
 
