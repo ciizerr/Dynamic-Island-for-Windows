@@ -6892,31 +6892,30 @@ class Renderer {
         IDWriteTextFormat* fmt = nullptr;
         if (usingFluentIcons_) {
             if (kind == 0) {
-                glyph = L"\uE622"; // Previous
+                glyph = L"\uF8AC";
                 fmt = mediaNavIconFormat_.Get();
             } else if (kind == 1) {
-                glyph = L"\uEDB4"; // Pause
+                glyph = L"\uF8AE";
                 fmt = mediaPlayIconFormat_.Get();
             } else if (kind == 2) {
-                glyph = L"\uEDB5"; // Play
+                glyph = L"\uF5B0";
                 fmt = mediaPlayIconFormat_.Get();
             } else if (kind == 3) {
-                glyph = L"\uE623"; // Next
+                glyph = L"\uF8AD";
                 fmt = mediaNavIconFormat_.Get();
             }
         } else {
-            // Segoe MDL2 Assets fallback
             if (kind == 0) {
-                glyph = L"\uE100"; // Previous
+                glyph = L"\uE100";
                 fmt = mediaNavIconFormat_.Get();
             } else if (kind == 1) {
-                glyph = L"\uE103"; // Pause
+                glyph = L"\uE103";
                 fmt = mediaPlayIconFormat_.Get();
             } else if (kind == 2) {
-                glyph = L"\uE102"; // Play
+                glyph = L"\uE102";
                 fmt = mediaPlayIconFormat_.Get();
             } else if (kind == 3) {
-                glyph = L"\uE101"; // Next
+                glyph = L"\uE101";
                 fmt = mediaNavIconFormat_.Get();
             }
         }
