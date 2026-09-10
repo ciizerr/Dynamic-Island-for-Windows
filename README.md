@@ -35,6 +35,7 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 - 📶 **Bluetooth Integration:** Get rich notifications showing the connected device's name, battery level, and logo whenever a Bluetooth device connects or disconnects.
 - 🎵 **Smooth Media Controls:** Fully overhauled media controls directly from the island. No more lag or bugs—just fluid, instant playback control alongside live album art.
 - 🖼️ **Image Clipboard Thumbnails:** Instantly preview a thumbnail of any image you copy to your clipboard. It's highly optimized and adds zero load to your system.
+- 🔕 **Do Not Disturb Integration:** Respects Windows notification panel Do Not Disturb mode and displays a status alert when toggled.
 
 **Core Features:**
 
@@ -47,7 +48,7 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 - 🖥️ **Windows 11 Style:** Swap to a modern Windows 11 Fluent style.
 - 📊 **Game Overlay:** Real-time FPS, CPU, GPU, and RAM stats built right in.
 - 📋 **Text & Notifications:** Instantly preview your text clipboard history or see your latest Windows notifications.
-- 🎨 **Themes & Fonts:** Pick from OLED Black, Dark Gray, Midnight Blue, Deep Purple, Fluent (Windows 11), or customize your own palette and use custom font families.
+- 🎨 **Themes & Fonts:** Pick from OLED Black, Fluent (Windows 11), Midnight Blue, Deep Purple, or customize your own palette and use custom font families.
 
 ---
 
@@ -77,7 +78,7 @@ Found a bug? Have a cool feature idea? We want to hear from you! Please drop an 
 - **[Sarthak Singh (sarthakaksh)](https://github.com/sarthakaksh)**: Major feature overhaul including the right-click focus timer, hover clock, robust media controls, zero-CPU instant hide shortcut, Bluetooth battery integration, image clipboard thumbnails, and full-screen autohide fixes.
 - **[ciizerr](https://github.com/ciizerr)**: Massive thanks for fixing UI alignments, smoothing out the dashboard sizing, and polishing the calendar and weather tabs.
 - **[ChrisSch-dev @GitHub](https://github.com/ChrisSch-dev)**: Added album title support, word wrapping for weather descriptions, sleep resume fixes, and various performance/movement stability improvements.
-- **[thevioletto @GitHub](https://github.com/thevioletto)**: Added custom font support, improved album art color extraction, reorganized settings into logical categories, and fixed various UI, media, and theme edge cases.
+- **[thevioletto @GitHub](https://github.com/thevioletto)**: Added custom font support, Windows Do Not Disturb integration and status alerts, improved album art color extraction, reorganized settings into logical categories, and fixed various UI, media, and theme edge cases.
 
 ---
 
