@@ -249,9 +249,6 @@ We love community contributions! To ensure high-quality updates, please follow t
   - PrivacyDots: true
     $name: Show privacy indicators (Mic & Camera)
     $description: Master toggle to display the iOS-style privacy dots when microphone or camera is in use.
-  - PrivacyDotsPulse: true
-    $name: Pulse privacy dots
-    $description: Animate active privacy dots with a soft breathing pulse. Turn off for static dots.
   - PrivacyDotsMic: true
     $name: Show microphone indicator (Orange dot)
     $description: Show the orange dot when microphone is in use. Turn off if background apps (like Discord/OBS) keep it permanently active.
@@ -448,8 +445,8 @@ namespace MediaLayout {
 
     constexpr float kScrubberY = 114.0f;
     constexpr float kScrubMargin = 24.0f;
-    constexpr float kScrubBarLeftInset = 36.0f;
-    constexpr float kScrubBarRightInset = 38.0f;
+    constexpr float kScrubBarLeftInset = 54.0f;
+    constexpr float kScrubBarRightInset = 54.0f;
 
     constexpr float kBarLeftCenter = -kHalfWidth + kScrubMargin + kScrubBarLeftInset;
     constexpr float kBarRightCenter = kHalfWidth - kScrubMargin - kScrubBarRightInset;
@@ -722,6 +719,8 @@ struct SystemSnapshot {
     bool micActive = false;      // orange dot: microphone in use
     bool cameraActive = false;   // green dot: camera in use
     std::wstring foregroundTitle;
+    std::wstring micApp;
+    std::wstring cameraApp;
 };
 
 struct Activity {
@@ -3866,12 +3865,43 @@ void UpdateSystemSnapshot(bool includeGpuStats, bool includeNetStats) {
 }
 
 // ---- Privacy indicator helpers ----
-bool IsDeviceActiveViaRegistry(const wchar_t* capability) {
+std::wstring CleanActiveAppName(const std::wstring& raw) {
+    std::wstring name;
+    size_t hashPos = raw.rfind(L'#');
+    if (hashPos != std::wstring::npos) {
+        name = raw.substr(hashPos + 1);
+        if (name.size() > 4 && _wcsicmp(name.c_str() + name.size() - 4, L".exe") == 0) {
+            name.resize(name.size() - 4);
+        }
+    } else {
+        size_t underPos = raw.find(L'_');
+        name = (underPos != std::wstring::npos) ? raw.substr(0, underPos) : raw;
+        if (name.rfind(L"Microsoft.", 0) == 0) name = name.substr(10);
+        if (name.rfind(L"Windows.", 0) == 0) name = name.substr(8);
+        else if (name.rfind(L"Windows", 0) == 0 && name.size() > 7) name = name.substr(7);
+    }
+    std::wstring lower = ToLowerCopy(name);
+    if (lower == L"msedge") return L"Microsoft Edge";
+    if (lower == L"chrome") return L"Google Chrome";
+    if (lower == L"brave") return L"Brave";
+    if (lower == L"firefox") return L"Firefox";
+    if (lower == L"discord") return L"Discord";
+    if (lower == L"zoom") return L"Zoom";
+    if (lower == L"obs64" || lower == L"obs32" || lower == L"obs") return L"OBS Studio";
+    if (lower == L"teams") return L"Microsoft Teams";
+    if (lower == L"skype") return L"Skype";
+    if (lower == L"audacity") return L"Audacity";
+    if (lower == L"fl64" || lower == L"fl") return L"FL Studio";
+    if (lower == L"ciscocollabhost") return L"Webex";
+    return name;
+}
+
+bool IsDeviceActiveViaRegistry(const wchar_t* capability, std::wstring* outAppName = nullptr) {
     bool isActive = false;
     std::wstring basePath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\";
     basePath += capability;
 
-    auto CheckSubkeys = [](HKEY hKeyParent) -> bool {
+    auto CheckSubkeys = [&](HKEY hKeyParent) -> bool {
         DWORD index = 0;
         wchar_t subKeyName[256];
         DWORD nameLen = ARRAYSIZE(subKeyName);
@@ -3889,6 +3919,9 @@ bool IsDeviceActiveViaRegistry(const wchar_t* capability) {
                             DWORD dataSize = sizeof(stopTime);
                             if (RegQueryValueExW(hNpSub, L"LastUsedTimeStop", nullptr, nullptr, reinterpret_cast<LPBYTE>(&stopTime), &dataSize) == ERROR_SUCCESS) {
                                 if (stopTime == 0) {
+                                    if (outAppName && outAppName->empty()) {
+                                        *outAppName = CleanActiveAppName(npSubKeyName);
+                                    }
                                     RegCloseKey(hNpSub);
                                     RegCloseKey(hSub);
                                     return true;
@@ -3904,6 +3937,9 @@ bool IsDeviceActiveViaRegistry(const wchar_t* capability) {
                     DWORD dataSize = sizeof(stopTime);
                     if (RegQueryValueExW(hSub, L"LastUsedTimeStop", nullptr, nullptr, reinterpret_cast<LPBYTE>(&stopTime), &dataSize) == ERROR_SUCCESS) {
                         if (stopTime == 0) {
+                            if (outAppName && outAppName->empty()) {
+                                *outAppName = CleanActiveAppName(subKeyName);
+                            }
                             RegCloseKey(hSub);
                             return true;
                         }
@@ -3933,12 +3969,12 @@ bool IsDeviceActiveViaRegistry(const wchar_t* capability) {
     return isActive;
 }
 
-bool IsMicrophoneActive() {
-    return IsDeviceActiveViaRegistry(L"microphone");
+bool IsMicrophoneActive(std::wstring* outAppName = nullptr) {
+    return IsDeviceActiveViaRegistry(L"microphone", outAppName);
 }
 
-bool IsCameraActive() {
-    return IsDeviceActiveViaRegistry(L"webcam");
+bool IsCameraActive(std::wstring* outAppName = nullptr) {
+    return IsDeviceActiveViaRegistry(L"webcam", outAppName);
 }
 
 void UpdateProgressSnapshot() {
@@ -3949,11 +3985,15 @@ void UpdateProgressSnapshot() {
 }
 
 void UpdatePrivacyIndicators() {
-    const bool mic = (g_settings.privacyDots && g_settings.privacyDotsMic) ? IsMicrophoneActive() : false;
-    const bool cam = (g_settings.privacyDots && g_settings.privacyDotsCam) ? IsCameraActive() : false;
+    std::wstring micApp;
+    std::wstring camApp;
+    const bool mic = (g_settings.privacyDots && g_settings.privacyDotsMic) ? IsMicrophoneActive(&micApp) : false;
+    const bool cam = (g_settings.privacyDots && g_settings.privacyDotsCam) ? IsCameraActive(&camApp) : false;
     std::lock_guard lock(g_stateMutex);
     g_state.system.micActive = mic;
     g_state.system.cameraActive = cam;
+    g_state.system.micApp = micApp;
+    g_state.system.cameraApp = camApp;
 }
 
 std::wstring ReadClipboardText(HWND hwnd) {
@@ -5326,60 +5366,38 @@ class Renderer {
         UNREFERENCED_PARAMETER(radius);
     }
 
-    // Apple Dynamic Island privacy dots.
-    // Placed inside the pill near the top-right edge — pulsing glow like iPhone.
     void DrawPrivacyDots(const SharedState& state, const Settings& settings, D2D1_RECT_F rect, double now) {
+        UNREFERENCED_PARAMETER(now);
+        const float height = rect.bottom - rect.top;
+        if (height > 55.0f) return;
+
         const bool mic = state.system.micActive && settings.privacyDots && settings.privacyDotsMic;
         const bool cam = state.system.cameraActive && settings.privacyDots && settings.privacyDotsCam;
         if (!mic && !cam) return;
 
-        const float pulse = settings.privacyDotsPulse
-            ? (0.72f + 0.28f * std::sin(static_cast<float>(now * 2.0 * 3.14159265 * 0.75)))
-            : 1.0f;
-
-        const float dotR   = 4.5f;
-        const float gap    = 5.5f;
+        const float dotR   = 4.0f;
         const float margin = 16.0f;
         const float dotY   = rect.top + (rect.bottom - rect.top) * 0.5f;
 
-        float x = rect.right - margin - dotR;
+        const float x = rect.right - margin - dotR;
 
         if (cam) {
             D2D1_COLOR_F camColor = settings.privacyDotsCamHex;
-            camColor.a = pulse * settingsOpacity_;
+            camColor.a = settingsOpacity_;
             if (!camDotBrush_) target_->CreateSolidColorBrush(camColor, &camDotBrush_);
             else camDotBrush_->SetColor(camColor);
-
-            D2D1_COLOR_F glowColor = camColor;
-            glowColor.a = 0.18f * pulse * settingsOpacity_;
-            if (!camGlowBrush_) target_->CreateSolidColorBrush(glowColor, &camGlowBrush_);
-            else camGlowBrush_->SetColor(glowColor);
 
             if (camDotBrush_) {
                 target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, dotY), dotR, dotR), camDotBrush_.Get());
             }
-            if (camGlowBrush_) {
-                target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, dotY), dotR * 2.2f, dotR * 2.2f), camGlowBrush_.Get());
-            }
-            x -= (dotR * 2.0f + gap);
-        }
-
-        if (mic) {
+        } else if (mic) {
             D2D1_COLOR_F micColor = settings.privacyDotsMicHex;
-            micColor.a = pulse * settingsOpacity_;
+            micColor.a = settingsOpacity_;
             if (!micDotBrush_) target_->CreateSolidColorBrush(micColor, &micDotBrush_);
             else micDotBrush_->SetColor(micColor);
 
-            D2D1_COLOR_F glowColor = micColor;
-            glowColor.a = 0.18f * pulse * settingsOpacity_;
-            if (!micGlowBrush_) target_->CreateSolidColorBrush(glowColor, &micGlowBrush_);
-            else micGlowBrush_->SetColor(glowColor);
-
             if (micDotBrush_) {
                 target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, dotY), dotR, dotR), micDotBrush_.Get());
-            }
-            if (micGlowBrush_) {
-                target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(x, dotY), dotR * 2.2f, dotR * 2.2f), micGlowBrush_.Get());
             }
         }
     }
@@ -5648,7 +5666,7 @@ class Renderer {
                                            gridStart + (col + 1) * colW, datesTop + (row + 1) * rowH);
 
             if (d == local.wDay) {
-                target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(cell.left + colW * 0.5f, cell.top + rowH * 0.5f), 10.0f * scale, 10.0f * scale), calHeader.Get());
+                target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(cell.left + colW * 0.5f, cell.top + rowH * 0.5f), 12.0f * scale, 12.0f * scale), calHeader.Get());
                 textBrush_->SetOpacity(1.0f);
                 target_->DrawTextW(std::to_wstring(d).c_str(), static_cast<UINT32>(std::to_wstring(d).length()),
                                    calGridFormat_ ? calGridFormat_.Get() : boldTextFormat_.Get(),
@@ -5854,14 +5872,11 @@ class Renderer {
     }
 
     void DrawTimeDashboard(const SharedState& state, D2D1_RECT_F rect, const Settings& settings, double now, float scale, SYSTEMTIME& local) {
-        (void)state;
         (void)now;
 
         const float cx = (rect.left + rect.right) * 0.5f;
         const float cy = (rect.top + rect.bottom) * 0.5f;
 
-        // Soft, edgeless accent glow behind the clock — a radial gradient that
-        // fades fully to transparent, optional via settings.clockAccentGlow.
         if (settings.clockAccentGlow) {
             D2D1_COLOR_F accentColor = accentBrush_ ? accentBrush_->GetColor() : D2D1::ColorF(0x4cc9f0);
             D2D1_GRADIENT_STOP stops[2] = {
@@ -5887,7 +5902,6 @@ class Renderer {
         wchar_t timeBuf[32] = {};
         GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, TIME_NOSECONDS, &local, nullptr, timeBuf, ARRAYSIZE(timeBuf));
 
-        // Time and date are much bigger, centered vertically around cy with reduced space between them
         D2D1_RECT_F timeRect = D2D1::RectF(rect.left, cy - 44.0f * scale, rect.right, cy + 20.0f * scale);
         textBrush_->SetOpacity(0.98f);
         IDWriteTextFormat* timeFmt = timeDashboardFormat_ ? timeDashboardFormat_.Get() : hugeTextFormat_.Get();
@@ -5901,6 +5915,85 @@ class Renderer {
         IDWriteTextFormat* dateFmt = dateDashboardFormat_ ? dateDashboardFormat_.Get() : boldTextFormat_.Get();
         target_->DrawTextW(dateBuf, static_cast<UINT32>(wcslen(dateBuf)), dateFmt, dateRect,
                            mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+
+        const bool micActive = state.system.micActive && settings.privacyDots && settings.privacyDotsMic;
+        const bool camActive = state.system.cameraActive && settings.privacyDots && settings.privacyDotsCam;
+
+        if (camActive || micActive) {
+            std::wstring label;
+            D2D1_COLOR_F dotColor;
+
+            if (camActive && micActive) {
+                dotColor = settings.privacyDotsCamHex;
+                if (!state.system.cameraApp.empty() && !state.system.micApp.empty() && state.system.cameraApp == state.system.micApp) {
+                    label = state.system.cameraApp + L" is using camera & microphone";
+                } else if (!state.system.cameraApp.empty() && !state.system.micApp.empty()) {
+                    label = state.system.cameraApp + L" & " + state.system.micApp + L" using camera & mic";
+                } else if (!state.system.cameraApp.empty()) {
+                    label = state.system.cameraApp + L" is using camera & microphone";
+                } else if (!state.system.micApp.empty()) {
+                    label = state.system.micApp + L" is using camera & microphone";
+                } else {
+                    label = L"Camera & microphone in use";
+                }
+            } else if (camActive) {
+                dotColor = settings.privacyDotsCamHex;
+                if (!state.system.cameraApp.empty()) {
+                    label = state.system.cameraApp + L" is using your camera";
+                } else {
+                    label = L"Camera in use";
+                }
+            } else {
+                dotColor = settings.privacyDotsMicHex;
+                if (!state.system.micApp.empty()) {
+                    label = state.system.micApp + L" is using your microphone";
+                } else {
+                    label = L"Microphone in use";
+                }
+            }
+
+            IDWriteTextFormat* fmt = smallTextFormat_ ? smallTextFormat_.Get() : textFormat_.Get();
+            if (fmt && dwriteFactory_) {
+                ComPtr<IDWriteTextLayout> textLayout;
+                HRESULT hr = dwriteFactory_->CreateTextLayout(
+                    label.c_str(), static_cast<UINT32>(label.size()),
+                    fmt, 500.0f, 30.0f, &textLayout);
+
+                if (SUCCEEDED(hr) && textLayout) {
+                    DWRITE_TEXT_METRICS tm = {};
+                    textLayout->GetMetrics(&tm);
+
+                    const float pillH = 22.0f * scale;
+                    const float pillW = tm.width + 28.0f * scale;
+                    const float pillX = cx - pillW * 0.5f;
+                    const float pillY = rect.bottom - 18.0f * scale - pillH;
+
+                    ComPtr<ID2D1SolidColorBrush> badgeBg;
+                    target_->CreateSolidColorBrush(D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.07f * settingsOpacity_), &badgeBg);
+                    if (badgeBg) {
+                        target_->FillRoundedRectangle(
+                            D2D1::RoundedRect(D2D1::RectF(pillX, pillY, pillX + pillW, pillY + pillH), pillH * 0.5f, pillH * 0.5f),
+                            badgeBg.Get());
+                    }
+
+                    ComPtr<ID2D1SolidColorBrush> dotBrush;
+                    dotColor.a = settingsOpacity_;
+                    target_->CreateSolidColorBrush(dotColor, &dotBrush);
+                    if (dotBrush) {
+                        const float badgeDotR = 3.5f * scale;
+                        target_->FillEllipse(
+                            D2D1::Ellipse(D2D1::Point2F(pillX + 10.0f * scale, pillY + pillH * 0.5f), badgeDotR, badgeDotR),
+                            dotBrush.Get());
+                    }
+
+                    mutedBrush_->SetOpacity(0.90f);
+                    target_->DrawTextLayout(
+                        D2D1::Point2F(pillX + 18.0f * scale, pillY + (pillH - tm.height) * 0.5f),
+                        textLayout.Get(), mutedBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
+                    mutedBrush_->SetOpacity(0.75f);
+                }
+            }
+        }
 
         textBrush_->SetOpacity(0.96f);
         mutedBrush_->SetOpacity(0.75f);
@@ -5983,9 +6076,7 @@ class Renderer {
 
             // Adjust right padding if privacy indicators (mic/camera) are active
             float rightPadding = 6.0f * scale;
-            if (state.system.micActive && state.system.cameraActive) {
-                rightPadding = 38.0f * scale;
-            } else if (state.system.micActive || state.system.cameraActive) {
+            if (state.system.micActive || state.system.cameraActive) {
                 rightPadding = 24.0f * scale;
             }
 
@@ -6060,13 +6151,7 @@ class Renderer {
 
             // Pagination dots (Vertical on the right edge)
             if (maxTabs > 1) {
-                float shiftX = 0.0f;
-                if (state.system.micActive && state.system.cameraActive) {
-                    shiftX = 36.0f * scale;
-                } else if (state.system.micActive || state.system.cameraActive) {
-                    shiftX = 22.0f * scale;
-                }
-                const float dotX = rect.right - 10.0f * scale - shiftX;
+                const float dotX = rect.right - 10.0f * scale;
                 const float dotY = (rect.top + rect.bottom) * 0.5f;
                 const float spacing = 8.0f * scale;
                 const float r = 2.5f * scale;
@@ -6624,18 +6709,11 @@ class Renderer {
                                                   rect.left + 24.0f + artSize, rect.top + 20.0f + artSize);
                 DrawAlbumArt(state.media, artRect, now, 16.0f, true);
 
-                float shiftX = 0.0f;
-                if (state.system.micActive && state.system.cameraActive) {
-                    shiftX = 36.0f;
-                } else if (state.system.micActive || state.system.cameraActive) {
-                    shiftX = 22.0f;
-                }
-
                 const float waveW = 32.0f;
                 const float waveH = 20.0f;
-                D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - shiftX - waveW,
+                D2D1_RECT_F waveRect = D2D1::RectF(rect.right - 24.0f - waveW,
                                                    rect.top + 20.0f + (artSize - waveH) * 0.5f,
-                                                   rect.right - 24.0f - shiftX,
+                                                   rect.right - 24.0f,
                                                    rect.top + 20.0f + (artSize + waveH) * 0.5f);
 
                 const float textLeft = artRect.right + 18.0f;
@@ -6664,9 +6742,15 @@ class Renderer {
                 if (state.media.playing) {
                     DrawWaveform(state, waveRect);
                 } else {
+                    const float gap = 2.5f;
+                    const float availableW = waveRect.right - waveRect.left;
+                    const int count = 7;
+                    const float barWidth = (availableW - gap * (count - 1)) / count;
+                    const float centerY = (waveRect.top + waveRect.bottom) * 0.5f;
                     mutedBrush_->SetOpacity(0.5f);
-                    for (int i = 0; i < 4; ++i) {
-                        target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 4.0f + 2.0f, (waveRect.top + waveRect.bottom) * 0.5f), 1.2f, 1.2f), mutedBrush_.Get());
+                    for (int i = 0; i < count; ++i) {
+                        const float dotX = waveRect.left + i * (barWidth + gap) + barWidth * 0.5f;
+                        target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, centerY), 1.2f, 1.2f), mutedBrush_.Get());
                     }
                 }
 
@@ -6703,12 +6787,21 @@ class Renderer {
                 const float scrubLeft = rect.left + MediaLayout::kScrubMargin;
                 const float scrubRight = rect.right - MediaLayout::kScrubMargin;
 
-                mutedBrush_->SetOpacity(0.8f);
-                D2D1_RECT_F elRect = D2D1::RectF(scrubLeft, scrubberY - 8.0f, scrubLeft + 40.0f, scrubberY + 8.0f);
-                target_->DrawTextW(elapsedStr.c_str(), static_cast<UINT32>(elapsedStr.size()), smallTextFormat_.Get(), elRect, mutedBrush_.Get());
+                const float timeLabelW = 44.0f;
+                D2D1_RECT_F elRect = D2D1::RectF(scrubLeft, scrubberY - 10.0f, scrubLeft + timeLabelW, scrubberY + 10.0f);
+                D2D1_RECT_F remRect = D2D1::RectF(scrubRight - timeLabelW, scrubberY - 10.0f, scrubRight, scrubberY + 10.0f);
 
-                D2D1_RECT_F remRect = D2D1::RectF(scrubRight - 36.0f, scrubberY - 8.0f, scrubRight, scrubberY + 8.0f);
-                target_->DrawTextW(remainStr.c_str(), static_cast<UINT32>(remainStr.size()), smallTextFormat_.Get(), remRect, mutedBrush_.Get());
+                mutedBrush_->SetOpacity(0.8f);
+                if (smallTextFormat_) {
+                    smallTextFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                    target_->DrawTextW(elapsedStr.c_str(), static_cast<UINT32>(elapsedStr.size()), smallTextFormat_.Get(), elRect, mutedBrush_.Get());
+
+                    smallTextFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    target_->DrawTextW(remainStr.c_str(), static_cast<UINT32>(remainStr.size()), smallTextFormat_.Get(), remRect, mutedBrush_.Get());
+
+                    smallTextFormat_->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+                    smallTextFormat_->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+                }
 
                 const float barLeft = scrubLeft + MediaLayout::kScrubBarLeftInset;
                 const float barRight = scrubRight - MediaLayout::kScrubBarRightInset;
@@ -6760,13 +6853,7 @@ class Renderer {
             // Pagination dots (Vertical on the right edge)
             if (maxTabs > 1) {
                 const float scale = 1.0f;
-                float shiftX = 0.0f;
-                if (state.system.micActive && state.system.cameraActive) {
-                    shiftX = 36.0f * scale;
-                } else if (state.system.micActive || state.system.cameraActive) {
-                    shiftX = 22.0f * scale;
-                }
-                const float dotX = rect.right - 10.0f * scale - shiftX;
+                const float dotX = rect.right - 10.0f * scale;
                 const float dotY = (rect.top + rect.bottom) * 0.5f;
                 const float spacing = 8.0f * scale;
                 const float r = 2.5f * scale;
@@ -6801,9 +6888,7 @@ class Renderer {
             DrawAlbumArt(state.media, artRect, now, artSize * 0.5f, false);
 
             float shiftX = 0.0f;
-            if (state.system.micActive && state.system.cameraActive) {
-                shiftX = 36.0f;
-            } else if (state.system.micActive || state.system.cameraActive) {
+            if (state.system.micActive || state.system.cameraActive) {
                 shiftX = 22.0f;
             }
 
@@ -6812,9 +6897,14 @@ class Renderer {
             if (state.media.playing) {
                 DrawWaveform(state, waveRect);
             } else {
+                const float gap = 2.5f;
+                const float availableW = waveRect.right - waveRect.left;
+                const int count = std::max(1, static_cast<int>((availableW + gap) / (2.0f + gap)));
+                const float barWidth = (availableW - gap * (count - 1)) / count;
                 mutedBrush_->SetOpacity(0.5f);
-                for (int i = 0; i < 4; ++i) {
-                    target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(waveRect.left + i * 6.0f + 3.0f, cy), 1.5f, 1.5f), mutedBrush_.Get());
+                for (int i = 0; i < count; ++i) {
+                    const float dotX = waveRect.left + i * (barWidth + gap) + barWidth * 0.5f;
+                    target_->FillEllipse(D2D1::Ellipse(D2D1::Point2F(dotX, cy), 1.2f, 1.2f), mutedBrush_.Get());
                 }
             }
 
@@ -7221,8 +7311,9 @@ class Renderer {
         const float remaining = Clamp(static_cast<float>(state.clipboard.expiresAt - now), 0.0f, ttl);
         const float progress = remaining / ttl;
 
-        D2D1_RECT_F badge = D2D1::RectF(rect.left + 12, rect.top + 10,
-                                       rect.left + 50, rect.bottom - 10);
+        const float cy = (rect.top + rect.bottom) * 0.5f;
+        D2D1_RECT_F badge = D2D1::RectF(rect.left + 12, cy - 18.0f,
+                                       rect.left + 50, cy + 18.0f);
         bool fillBadge = true;
         D2D1_COLOR_F bgColor = D2D1::ColorF(1, 1, 1, 0.070f);
         if (g_settings.clipboardIconBgStyle == ClipboardIconBgStyle::Transparent) {
@@ -7279,8 +7370,8 @@ class Renderer {
             textBrush_->SetOpacity(0.90f);
         }
 
-        D2D1_RECT_F titleRect = D2D1::RectF(badge.right + 11, rect.top + 9,
-                                           rect.right - 18, rect.top + 25);
+        D2D1_RECT_F titleRect = D2D1::RectF(badge.right + 11, cy - 17.0f,
+                                           rect.right - 18, cy - 1.0f);
         mutedBrush_->SetOpacity(0.48f);
         const std::wstring clipTitle =
             state.clipboard.appName.empty()
@@ -7290,13 +7381,13 @@ class Renderer {
                            smallTextFormat_.Get(), titleRect, mutedBrush_.Get(),
                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
-        D2D1_RECT_F textRect = D2D1::RectF(badge.right + 11, rect.top + 25,
-                                           rect.right - 18, rect.bottom - 12);
+        D2D1_RECT_F textRect = D2D1::RectF(badge.right + 11, cy - 1.0f,
+                                           rect.right - 18, cy + 16.0f);
         DrawMarqueeText(state.clipboard.text.empty() ? L"Copied" : state.clipboard.text,
                         textRect, textFormat_.Get(), textBrush_.Get(), now, 34.0f, marqueeClipboardCache_);
 
-        D2D1_RECT_F track = D2D1::RectF(badge.right + 11, rect.bottom - 8,
-                                       rect.right - 20, rect.bottom - 6);
+        D2D1_RECT_F track = D2D1::RectF(badge.right + 11, cy + 20.0f,
+                                       rect.right - 20, cy + 22.0f);
         ComPtr<ID2D1SolidColorBrush> trackBrush;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.08f), &trackBrush);
         target_->FillRoundedRectangle(D2D1::RoundedRect(track, 1, 1), trackBrush.Get());
@@ -7352,7 +7443,7 @@ class Renderer {
 
         const float tx = badge.right + 14;
         // App name — small label.
-        D2D1_RECT_F appRect = D2D1::RectF(tx, cy - 22, rect.right - 14, cy - 6);
+        D2D1_RECT_F appRect = D2D1::RectF(tx, cy - 18.0f, rect.right - 14.0f, cy - 2.0f);
         mutedBrush_->SetOpacity(0.75f);
         target_->DrawTextW(state.notification.app.c_str(),
                            static_cast<UINT32>(state.notification.app.size()),
@@ -7360,14 +7451,14 @@ class Renderer {
                            D2D1_DRAW_TEXT_OPTIONS_CLIP);
 
         // Title — bold white.
-        D2D1_RECT_F titleRect = D2D1::RectF(tx, cy - 4, rect.right - 14, cy + 17);
+        D2D1_RECT_F titleRect = D2D1::RectF(tx, cy - 2.0f, rect.right - 14.0f, cy + 16.0f);
         textBrush_->SetOpacity(0.95f);
         DrawMarqueeText(state.notification.title.empty() ? L"Notification" : state.notification.title,
                         titleRect, textFormat_.Get(), textBrush_.Get(), now, 28.0f, marqueeNotificationCache_);
         textBrush_->SetOpacity(0.90f);
 
         // Thicker, softer progress bar at bottom.
-        D2D1_RECT_F track = D2D1::RectF(tx, rect.bottom - 7, rect.right - 14, rect.bottom - 3);
+        D2D1_RECT_F track = D2D1::RectF(tx, cy + 20.0f, rect.right - 14.0f, cy + 23.0f);
         ComPtr<ID2D1SolidColorBrush> trackBrush;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.08f), &trackBrush);
         target_->FillRoundedRectangle(D2D1::RoundedRect(track, 2, 2), trackBrush.Get());
@@ -7407,7 +7498,7 @@ class Renderer {
         }
 
         const float tx = badge.right + 14;
-        D2D1_RECT_F labelRect = D2D1::RectF(tx, cy - 22, rect.right - 58, cy - 6);
+        D2D1_RECT_F labelRect = D2D1::RectF(tx, cy - 13.0f, rect.right - 58, cy + 3.0f);
         mutedBrush_->SetOpacity(0.50f);
         const std::wstring deviceLabel =
             state.volume.deviceName.empty() ? std::wstring(L"Volume") : state.volume.deviceName;
@@ -7421,21 +7512,21 @@ class Renderer {
         } else {
             swprintf_s(value, L"%d%%", state.volume.percent);
         }
-        D2D1_RECT_F valueRect = D2D1::RectF(rect.right - 58, cy - 22, rect.right - 14, cy - 6);
+        D2D1_RECT_F valueRect = D2D1::RectF(rect.right - 58, cy - 13.0f, rect.right - 14, cy + 3.0f);
         target_->DrawTextW(value, static_cast<UINT32>(wcslen(value)), smallTextFormat_.Get(),
                            valueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
         textBrush_->SetOpacity(0.90f);
 
-        D2D1_RECT_F track = D2D1::RectF(tx, cy + 2, rect.right - 14, cy + 6);
+        D2D1_RECT_F track = D2D1::RectF(tx, cy + 7.0f, rect.right - 14, cy + 12.0f);
         ComPtr<ID2D1SolidColorBrush> trackBrush;
         target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.08f), &trackBrush);
-        target_->FillRoundedRectangle(D2D1::RoundedRect(track, 2, 2), trackBrush.Get());
+        target_->FillRoundedRectangle(D2D1::RoundedRect(track, 2.5f, 2.5f), trackBrush.Get());
         const float pct = Clamp(state.volume.percent / 100.0f, 0.0f, 1.0f);
         D2D1_RECT_F fill = D2D1::RectF(track.left, track.top,
                                        track.left + (track.right - track.left) * pct,
                                        track.bottom);
         accentBrush_->SetOpacity(muted ? 0.24f : 0.85f);
-        target_->FillRoundedRectangle(D2D1::RoundedRect(fill, 2, 2), accentBrush_.Get());
+        target_->FillRoundedRectangle(D2D1::RoundedRect(fill, 2.5f, 2.5f), accentBrush_.Get());
         accentBrush_->SetOpacity(1.0f);
         mutedBrush_->SetOpacity(0.58f);
     }
@@ -7815,12 +7906,12 @@ class Renderer {
         if (hasBattery) {
             const float bw = 15.0f;
             const float bh = 8.0f;
-            D2D1_RECT_F batRect = D2D1::RectF(rect.right - 48, cy - bh * 0.5f - 12.0f,
-                                              rect.right - 48 + bw, cy + bh * 0.5f - 12.0f);
+            D2D1_RECT_F batRect = D2D1::RectF(rect.right - 48, cy - bh * 0.5f - 9.0f,
+                                              rect.right - 48 + bw, cy + bh * 0.5f - 9.0f);
             ComPtr<ID2D1SolidColorBrush> batBorder;
             target_->CreateSolidColorBrush(D2D1::ColorF(1, 1, 1, 0.75f), &batBorder);
             target_->DrawRoundedRectangle(D2D1::RoundedRect(batRect, 1.5f, 1.5f), batBorder.Get(), 1.2f);
-            D2D1_RECT_F nub = D2D1::RectF(batRect.right, cy - 12.0f - 2.0f, batRect.right + 1.6f, cy - 12.0f + 2.0f);
+            D2D1_RECT_F nub = D2D1::RectF(batRect.right, cy - 9.0f - 2.0f, batRect.right + 1.6f, cy - 9.0f + 2.0f);
             target_->FillRectangle(nub, batBorder.Get());
 
             const float pct = Clamp(battery / 100.0f, 0.0f, 1.0f);
@@ -7834,7 +7925,7 @@ class Renderer {
 
             wchar_t pctBuf[16] = {};
             swprintf_s(pctBuf, L"%d%%", battery);
-            D2D1_RECT_F pctRect = D2D1::RectF(rect.right - 48, cy - 5.0f, rect.right - 14, cy + 13.0f);
+            D2D1_RECT_F pctRect = D2D1::RectF(rect.right - 48, cy - 1.0f, rect.right - 14, cy + 15.0f);
             textBrush_->SetOpacity(0.85f);
             target_->DrawTextW(pctBuf, static_cast<UINT32>(wcslen(pctBuf)), smallTextFormat_.Get(),
                                pctRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_NONE);
@@ -7953,7 +8044,7 @@ class Renderer {
 
         // Text Labels
         const float tx = badge.right + 14;
-        D2D1_RECT_F labelRect = D2D1::RectF(tx, cy - 22, rect.right - 14, cy - 6);
+        D2D1_RECT_F labelRect = D2D1::RectF(tx, cy - 16.0f, rect.right - 14.0f, cy - 1.0f);
         mutedBrush_->SetOpacity(0.50f);
         std::wstring label = state.battery.charging ? L"Power Connected" : L"Battery Alert";
         target_->DrawTextW(label.c_str(), static_cast<UINT32>(label.size()),
@@ -7969,7 +8060,7 @@ class Renderer {
             swprintf_s(value, ARRAYSIZE(value), L"%d%%", state.battery.percent);
         }
 
-        D2D1_RECT_F valueRect = D2D1::RectF(tx, cy - 4, rect.right - 14, cy + 17);
+        D2D1_RECT_F valueRect = D2D1::RectF(tx, cy - 1.0f, rect.right - 14.0f, cy + 16.0f);
         textBrush_->SetOpacity(0.95f);
         target_->DrawTextW(value, static_cast<UINT32>(wcslen(value)), textFormat_.Get(),
                            valueRect, textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
@@ -7979,9 +8070,9 @@ class Renderer {
     void DrawProgress(const SharedState& state, D2D1_RECT_F rect) {
         wchar_t buffer[64] = {};
         swprintf_s(buffer, L"Progress %d%%", state.progress.percent);
-        target_->DrawTextW(buffer, static_cast<UINT32>(wcslen(buffer)), textFormat_.Get(),
-                           D2D1::RectF(rect.left + 18, rect.top + 14, rect.right - 18,
-                                       rect.bottom - 10),
+        IDWriteTextFormat* fmt = idleTextFormat_ ? idleTextFormat_.Get() : textFormat_.Get();
+        target_->DrawTextW(buffer, static_cast<UINT32>(wcslen(buffer)), fmt,
+                           rect,
                            textBrush_.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP);
     }
 
