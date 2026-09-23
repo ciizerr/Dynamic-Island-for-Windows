@@ -7,14 +7,30 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 ## 📸 See it in Action
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/Full-preview.png" alt="Dynamic Island Preview" width="600" style="border-radius: 8px; margin: 10px;"/>
+  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/desktop.png" alt="Dynamic Island running on the desktop" width="900" style="border-radius: 8px; margin: 10px;"/>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/Full-preview.png" alt="Dynamic Island surfaces" width="760" style="border-radius: 8px; margin: 10px;"/>
 </p>
 
 ### Dashboards
 
 | Media Player | Calendar | Weather | Game Overlay | Idle View |
 | :---: | :---: | :---: | :---: | :---: |
-| <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/media.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/calender.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/weather.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/gamebar.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/idle.png" width="200" /> |
+| <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/media.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/calendar.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/weather.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/gamebar.png" width="200" /> | <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/idle.png" width="200" /> |
+
+### Hardware Monitor
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/hardware-monitor.png" alt="Hardware Monitor" width="420" style="border-radius: 8px; margin: 10px;"/>
+</p>
+
+### Themes
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/devcode90/Dynamic-Island-for-Windows/main/previews/themes.png" alt="Themes" width="760" style="border-radius: 8px; margin: 10px;"/>
+</p>
 
 ### Privacy Indicators
 
@@ -48,7 +64,7 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 - 🖥️ **Windows 11 Style:** Swap to a modern Windows 11 Fluent style.
 - 📊 **Game Overlay:** Real-time FPS, CPU, GPU, and RAM stats built right in.
 - 📋 **Text & Notifications:** Instantly preview your text clipboard history or see your latest Windows notifications.
-- 🎨 **Themes & Fonts:** Pick from OLED Black, Fluent (Windows 11), Midnight Blue, Deep Purple, or customize your own palette and use custom font families.
+- 🎨 **Themes & Fonts:** Eight curated themes — Obsidian, Graphite, Slate, Nord, Evergreen, Espresso, Plum, and a light Porcelain — switchable from the right-click Theme submenu, or customize your own palette and use custom font families.
 
 ---
 
@@ -56,14 +72,22 @@ A smooth, interactive overlay for your desktop, inspired by Apple's Dynamic Isla
 
 Tweak the mod easily from the **Windhawk settings panel**:
 
-- **Position:** Place it Top Center, Top Left, Top Right, or Bottom Center.
-- **Scale & Fonts:** Adjust the size scale and specify any custom font family with automatic system fallbacks.
+- **Position:** Place it Top Center, Top Left, Top Right, Bottom Center, Bottom Left, or Bottom Right, with optional separate vertical offsets for the collapsed and expanded states.
+- **Scale & Fonts:** Adjust the size scale, scale all island text independently from 70% to 160%, and specify any custom font family with automatic system fallbacks.
 - **Shortcuts:** Customize your keyboard shortcuts, including the instant hide/unhide toggle (Default: `Ctrl+Alt+D`).
 - **Style:** Choose the classic iPhone Pill look, macOS Notch, or modern Windows 11 style.
-- **Themes & Colors:** Choose built-in presets (with matching borders), set custom palette colors, or let album art dynamically tint the island.
+- **Themes & Colors:** Choose built-in presets (with matching borders), set custom palette colors, or let album art dynamically tint the island. Hex colors accept an alpha channel (`#RRGGBBAA`) for a translucent island with crisp text.
+- **Depth & Material:** Toggle the layered depth shading, the specular glass edge, and the soft drop shadow, and dial the album-art accent bloom from 0 to 200%.
+- **Backdrop Material:** Turn on real Windows blur or frosted acrylic behind the island, then set how much of it shows through. Requires Windows 10 1803 or newer; on older builds the island just stays opaque.
+- **Language:** Pick from 12 languages, or let the island follow your Windows display language.
+- **Clock & Date:** Choose 12- or 24-hour time, show seconds, promote the date above the time, and set a custom date pattern — CJK forms like `yyyy年MM月dd日` work as typed.
+- **File Tray:** Enable the shelf, then drag files onto the island to park them. Click a row to open it; right-click the island to clear it. Files are only referenced, never copied or moved.
+- **Media Exclusions:** Name apps or sites that should never make the island expand on a track change, so short-form video feeds stop popping it open.
+- **Game Overlay:** Choose which of FPS, CPU, GPU, RAM and disk to show, and switch to a compact strip that fits the taskbar.
 - **Refresh Rate & Animations:** Match your display's refresh rate (up to 360Hz/500Hz+), select physics styles (Smooth, Default, Bouncy, Snappy), and fine-tune animation speeds.
 - **Modules & Visibility:** Configure media, dashboards, privacy dots, system flyouts, auto-hide idle behavior, and shortcuts.
 - **Process Inclusion (for Notifications):** To use the notification module, you must add `explorer.exe` to the process inclusion list under the **Advanced** tab of the mod settings in Windhawk, then restart the mod.
+- **Notification Permission (for Notifications):** Windows must also allow apps to read your notifications. Turn on **Settings → Privacy & security → Notifications → "Let apps access your notifications"**. If this is off, Windows denies the listener and no notification will reach the island no matter how the mod is configured. When notifications still don't show, check the mod's log in Windhawk for a "permission not granted" line.
 
 ---
 
