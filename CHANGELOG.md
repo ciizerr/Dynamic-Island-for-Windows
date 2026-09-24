@@ -4,7 +4,55 @@ All notable changes, enhancements, and bug fixes for **Dynamic Island for Window
 
 ---
 
-## [Unreleased / Latest Updates]
+## [1.3.0] — 2026-09-24
+
+### ✅ Resolved Issues
+
+Every reported issue addressed in this release, and where to find the change.
+Issue numbers without a prefix are on this repository; `ramensoftware#NNNN`
+refers to the [windhawk-mods](https://github.com/ramensoftware/windhawk-mods)
+tracker the published mod is submitted through.
+
+| Issue | Reported | Addressed by |
+| --- | --- | --- |
+| [#83](../../issues/83) | Separate Offset Y for collapsed vs expanded | Separate Offset Y For Collapsed And Expanded |
+| [#82](../../issues/82) | Weather text not vertically centred | Weather Accuracy & Layout |
+| [#81](../../issues/81) | Action Center notifications don't work | Notification Setup Clarified, Notification Listener Resiliency |
+| [#79](../../issues/79) | Should disappear when nothing is playing | Auto-Hide Island Across All States |
+| [#76](../../issues/76) | Want to disable the volume flyout | `Modules.Volume` toggle — Weather/Volume module toggles |
+| [#74](../../issues/74) | Skip forward/back doesn't work | Media Controls Now Actually Respond |
+| [#73](../../issues/73) | Shouldn't sit on top and block app tabs | `AlwaysOnTop` off, click-through, fullscreen auto-hide |
+| [#72](../../issues/72) | Bottom-left / bottom-right positions | Position & Z-Order |
+| [#71](../../issues/71) | 60 FPS not smooth on 144 Hz+ | High Refresh Rate (360Hz+) Support |
+| [#70](../../issues/70) | Media buttons unresponsive | Media Controls Now Actually Respond |
+| [#69](../../issues/69) | Auto-hide when something is fullscreen | `AutoHideFullscreen` — Auto-Hide Island Across All States |
+| [#67](../../issues/67) | More background colour control | Custom Colours & Transparency, Eight New Themes |
+| [#66](../../issues/66) | Album art clipping | Album Art Clipping |
+| [#65](../../issues/65) | Disable mic/camera privacy lights | Privacy Indicator Customization & Toggles |
+| [#64](../../issues/64) | FPS options, 60 FPS laggy on 360 Hz | High Refresh Rate (360Hz+) Support |
+| [#63](../../issues/63) | Weather not working | Weather Accuracy & Layout |
+| [#62](../../issues/62) | Expands constantly on short-form video | Media Auto-Expand Exclusions |
+| [#61](../../issues/61) | Clock and date presentation | Typography & Clock Control |
+| [#60](../../issues/60) | Doesn't disappear despite hide setting | Auto-Hide Island Across All States |
+| [#59](../../issues/59) | Translucency and more customization | Real Blur & Acrylic Backdrop |
+| [#57](../../issues/57) | Hide when untouched | Auto-Hide Island Across All States |
+| [#49](../../issues/49) | Privacy dot stays on | Privacy Indicator No Longer Sticks On |
+| [#45](../../issues/45) | VLC playback not detected | VLC Detection |
+| [#44](../../issues/44) | Game overlay missing, idle-hide broken, wants an expand toggle | Game Overlay Options, Auto-Hide, `MediaAutoExpand` |
+| [#41](../../issues/41) | Font face and size for clock/weather | Typography & Clock Control |
+| [#35](../../issues/35) | Localization | Multi-Language Support |
+| [#33](../../issues/33) | Border-merged mode, Bluetooth view, file tray | File Tray, Border-Merged Mode, Bluetooth View |
+| [#31](../../issues/31) | PowerToys bar z-order conflict | Position & Z-Order |
+| [#25](../../issues/25) | More game mode options | Game Overlay Options, Game Overlay Rebuilt |
+| ramensoftware#4352 | Caps Lock toggle, wind arrows | Caps Lock Toggle & Wind Direction Arrows |
+| ramensoftware#4738 | Media pins the island open | Auto-Hide Island Across All States |
+| ramensoftware#5086 | Island wastes space, date formatting | Collapsed strip sized to content, Typography & Clock Control |
+
+**Still open, deliberately.** [#27](../../issues/27) asks for local speech-to-text;
+that needs a bundled ASR model, which is not something a Windhawk mod can
+reasonably ship. [#20](../../issues/20) asks for Fahrenheit, which the
+**Weather in Fahrenheit** setting already does — it switches the temperature,
+wind speed and feels-like values together.
 
 ### 🎨 Visual Redesign
 
